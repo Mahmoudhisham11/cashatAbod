@@ -1,0 +1,21 @@
+.walletBtn {
+    width: 100%;
+    background-color: var(--main-color);
+    color: white;
+    font-size: 20px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 8px;
+    padding: 5px;
+    cursor: pointer;
+}
+.closeBtn {
+    position: absolute;
+    left: 15px;
+    top: 15px;
+    background-color: transparent;
+    color: var(--text-color);
+    font-size: 20px;
+    border: none;
+    cursor: pointer;
+}

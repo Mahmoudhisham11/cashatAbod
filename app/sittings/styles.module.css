@@ -1,0 +1,243 @@
+.sittingsContainer {
+    width: 100%;
+    height: 100vh;
+    background-color: var(--bg-color);
+}
+.content {
+    padding: 30px 2%;
+}
+.btnsContainer {
+    width: 100%;
+    display: flex;
+    align-items: start;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 20px;
+    padding: 15px;
+    background-color: var(--gray-color);
+    border-radius: 28px;
+}
+.btnsContainer hr {
+    width: 100%;
+}
+.accContainer h2{
+    color: var(--secondary-text);
+}
+.btnContent {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.btnContent p {
+    color: var(--text-color);
+    font-size: 20px;
+}
+.btnContent button {
+    background-color: transparent;
+    border: none;
+    color: var(--text-color);
+    display: flex;
+    justify-content: center;
+    align-content: center;
+    gap: 10px;
+    font-size: 20px;
+    cursor: pointer;
+}
+.btnContent button span:first-child {
+    width: 40px;
+    height: 40px;
+    background-color: var(--gray-color);
+    color: var(--text-color);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.helpContainer {
+    margin-top: 30px;
+    padding-bottom: 15px;
+}
+.helpContainer h2 {
+    color: var(--secondary-text);
+}
+.passwordForm {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+/* ------------------ Popup احترافي ------------------ */
+.popupOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: fadeIn 0.3s ease-in-out;
+  z-index: 9999;
+}
+
+.popupContent {
+  background-color: var(--background);
+  border-radius: 16px;
+  padding: 25px 20px;
+  width: 420px;
+  max-width: 95%;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  animation: slideUp 0.35s ease-out;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.popupContent h3 {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  text-align: center;
+  color: var(--text-color);
+  border-bottom: 1px solid var(--text-color);
+  padding-bottom: 10px;
+}
+
+.popupContent label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+/* القائمة */
+.popupContent select {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--text-color);
+  outline: none;
+  font-size: 14px;
+  background: var(--background);
+  transition: 0.3s;
+}
+.popupContent select:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52,152,219,0.15);
+  background: var(--background);
+}
+
+/* ✅ تنسيق الـ checkboxes العصري */
+.locks {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 10px 0;
+}
+
+.locks label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--text-color);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.locks label:hover {
+  color: #3498db;
+}
+
+.locks input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 2px solid #3498db;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.25s ease;
+  cursor: pointer;
+  position: relative;
+  background: #fff;
+}
+
+.locks input[type="checkbox"]:checked {
+  background: #3498db;
+  border-color: #3498db;
+}
+.locks input[type="checkbox"]:checked::after {
+  content: "✔";
+  font-size: 13px;
+  color: #fff;
+  position: absolute;
+}
+
+/* حقل كلمة المرور */
+.passwordInput {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.passwordInput input {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+  outline: none;
+  font-size: 14px;
+  background: #fafafa;
+  transition: 0.3s;
+}
+.passwordInput input:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52,152,219,0.15);
+  background: #fff;
+}
+
+/* الأزرار */
+.saveBtn, .closeBtn {
+  width: 100%;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+.saveBtn {
+  background: var(--main-color);
+  color: #fff;
+}
+.saveBtn:hover {
+  opacity: 0.9;
+}
+.closeBtn {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: #fff;
+}
+.closeBtn:hover {
+  opacity: 0.9;
+}
+
+/* أنيميشن الفتح */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@media(max-width: 767px) {
+  .popupContent {
+    width: 90%;
+    padding: 20px 15px;
+  }
+}

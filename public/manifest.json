@@ -1,0 +1,21 @@
+{
+    "name": "Cashat",
+    "short_name": "Cashat",
+    "description": "Cashat is tracking your money and give you reports",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#ffffff",
+    "iocns": [
+        {
+            "src": "/web-app-manifest-512x512.png",
+            "size": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "/web-app-manifest-192x192.png",
+            "size": "192x192",
+            "type": "image/png"
+        }
+    ]
+}   

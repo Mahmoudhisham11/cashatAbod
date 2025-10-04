@@ -1,0 +1,236 @@
+.debts {
+    width: 100%;
+    height: 100vh;
+    background-color: var(--bg-color);
+}
+.content {
+    width: 100%;
+    padding: 30px 1%;
+    display: flex;
+    justify-content: start;
+    align-items: start;
+    flex-direction: column;
+    gap: 15px;
+}
+.addBtn {
+    width: 100%;
+    height: 40px;
+    font-size: 20px;
+    border: none;
+    border-radius: 8px;
+    background-color: var(--main-color);
+    margin-top: 20px;
+    color: white;
+    cursor: pointer;
+}
+.btnsContainer {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.btnsContainer button {
+    width: fit-content;
+    height: fit-content;
+    text-align: center;
+    padding: 7px;
+    background-color: var(--gray-color);
+    color: var(--text-color);
+    border: none;
+    border-radius: 8px;
+    font-size: 20px;
+    cursor: pointer;
+    transition: .3s;
+}
+.btnsContainer button.active {
+    background-color: var(--main-color);
+    color: white    ;
+}
+.debtsInfo {
+    width: 100%;
+    height: calc(100vh - 230px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+}
+.info {
+    width: 100%;
+}
+.headContainer {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.totals {
+    width: 100%;
+    display: flex;
+    justify-content: start;
+    align-items: start;
+    flex-direction: column;
+}
+.headBtns button {
+    width: 55px;
+    height: 40px;
+    border: none;
+    font-size: 20px;
+    border-radius: 8px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(122, 255, 122, 0.37);
+    color: rgb(2, 145, 2);
+    transition: .3s;
+    cursor: pointer;
+}
+.headBtns button:hover {
+    background-color: green;
+    color: white;
+}
+.debtsContent {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 20px;
+}
+.tableContainer {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: scroll;
+}
+.tableContainer::-webkit-scrollbar {
+    display: none;
+}
+.actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+.actions button {
+    width: 40px;
+    height: 40px;
+    border: none;
+    font-size: 20px;
+    border-radius: 8px;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+.actions button:first-child {
+    background-color: var(--main-color);
+}
+.actions button:last-child {
+    background-color: rgb(250, 39, 39);
+}
+/* Overlay */
+.popupOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+  animation: fadeIn 0.3s ease forwards;
+}
+
+/* Popup Container */
+.popupContent {
+  background-color: var(--background);
+  border-radius: 12px;
+  width: 400px;
+  max-width: 90%;
+  padding: 20px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+  animation: scaleIn 0.3s ease forwards;
+  transform: scale(0.8);
+  opacity: 0;
+}
+
+/* Header */
+.popupHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.popupHeader h3 {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--text-color);
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: var(--text-color);
+  transition: color 0.2s;
+}
+
+.closeBtn:hover {
+  color: #ff3b30;
+}
+
+/* Body */
+.popupBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inputContainer {
+  display: flex;
+  flex-direction: column;
+}
+
+.inputContainer label {
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: var(--text-color);
+}
+
+.inputContainer input,
+.inputContainer select {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+}
+
+.confirmBtn {
+  margin-top: 10px;
+  padding: 10px 0;
+  background-color: var(--main-color);
+  color: #fff;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:  0.2s;
+}
+
+
+/* Animations */
+@keyframes fadeIn {
+  from {opacity: 0;}
+  to {opacity: 1;}
+}
+
+@keyframes scaleIn {
+  from {transform: scale(0.8); opacity: 0;}
+  to {transform: scale(1); opacity: 1;}
+}
