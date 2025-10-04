@@ -29,7 +29,6 @@ function Login() {
           name,
           email,
           password,
-          isSubscribed: false,
           date: serverTimestamp(),
         });
         alert("✅ تم انشاء حساب جديد");
@@ -55,9 +54,6 @@ function Login() {
       if (userData.password !== password) {
         alert("❌ يوجد مشكلة في كلمة المرور");
       } else {
-        if (userData.isSubscribed !== true) {
-          alert("⚠️ انت غير مشترك في التطبيق كلم 01124514331 للاشتراك");
-        } else {
           if (typeof window !== "undefined") {
             localStorage.setItem("email", email);
             localStorage.setItem("name", userData.name);
@@ -67,7 +63,6 @@ function Login() {
           }
         }
       }
-    }
   };
 
   // ✅ إرسال OTP
