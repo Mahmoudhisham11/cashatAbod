@@ -33,10 +33,10 @@ function Sittings() {
     });
     const [lockPassword, setLockPassword] = useState("");
 
-    // ✅ الحماية: التحقق من كلمة المرور قبل الدخول
     const [authorized, setAuthorized] = useState(false);
     const [loading, setLoading] = useState(true);
 
+    // 🔹 التحقق من صلاحية الدخول لصفحة الإعدادات
     useEffect(() => {
         const checkLock = async () => {
             const email = localStorage.getItem("email");
@@ -46,24 +46,33 @@ function Sittings() {
             }
 
             const snapshot = await getDocs(collection(db, "users"));
-            if (!snapshot.empty) {
-                // أول مستخدم (ممكن تعدل بعدين بحيث يكون المستخدم الحالي فقط)
-                const userDoc = snapshot.docs[0];
-                const data = userDoc.data();
+            const currentUserDoc = snapshot.docs.find(doc => doc.data().email === email);
 
-                if (data.lockSettings) {
-                    const input = prompt("🚫 تم قفل صفحة الإعدادات\nمن فضلك أدخل كلمة المرور:");
-                    if (input === data.lockPassword) {
-                        setAuthorized(true);
-                    } else {
-                        alert("❌ كلمة المرور غير صحيحة");
-                        router.push('/');
-                    }
-                } else {
+            if (!currentUserDoc) {
+                router.push('/');
+                return;
+            }
+
+            const data = currentUserDoc.data();
+
+            // التحقق من كلمة مرور الإعدادات
+            if (data.lockSettings) {
+                let passwordToCheck = data.lockPassword || "";
+                // تحقق إذا موجود كلمة المرور في collection passwords
+                const passSnap = await getDoc(doc(db, "passwords", currentUserDoc.id));
+                if (passSnap.exists()) {
+                    passwordToCheck = passSnap.data().lockPassword || passwordToCheck;
+                }
+
+                const input = prompt("🚫 تم قفل صفحة الإعدادات\nمن فضلك أدخل كلمة المرور:");
+                if (input === passwordToCheck) {
                     setAuthorized(true);
+                } else {
+                    alert("❌ كلمة المرور غير صحيحة");
+                    router.push('/');
                 }
             } else {
-                router.push('/');
+                setAuthorized(true);
             }
 
             setLoading(false);
@@ -76,9 +85,7 @@ function Sittings() {
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const storageName = localStorage.getItem('name');
-            if (storageName) {
-                setUserName(storageName);
-            }
+            if (storageName) setUserName(storageName);
         }
     }, []);
 
@@ -95,6 +102,7 @@ function Sittings() {
     // 🔹 تحميل صلاحيات وكلمة مرور المستخدم المختار
     useEffect(() => {
         if (!selectedUserId) return;
+
         const fetchUserData = async () => {
             const userSnap = await getDoc(doc(db, "users", selectedUserId));
             if (userSnap.exists()) {
@@ -123,6 +131,7 @@ function Sittings() {
                 setLockPassword(""); 
             }
         };
+
         fetchUserData();
     }, [selectedUserId]);
 
@@ -174,7 +183,6 @@ function Sittings() {
             <Developer openDev={openDev} setOpenDev={setOpenDev} />
             <CashPop openCash={openCash} setOpenCash={setOpenCash} />
 
-            {/* 🔹 Popup صلاحيات */}
             {openPermissions && (
                 <div className={styles.popupOverlay} onClick={() => setOpenPermissions(false)}>
                     <div className={styles.popupContent} onClick={(e) => e.stopPropagation()}>
@@ -195,62 +203,16 @@ function Sittings() {
                         {selectedUserId && (
                             <>
                                 <div className={styles.locks}>
-                                    <label>
-                                        <input
-                                            type="checkbox"
-                                            checked={locks.reports}
-                                            onChange={() => setLocks(prev => ({ ...prev, reports: !prev.reports }))}
-                                        />
-                                        اقفال التقارير
-                                    </label>
-                                    <label>
-                                        <input
-                                            type="checkbox"
-                                            checked={locks.numbers}
-                                            onChange={() => setLocks(prev => ({ ...prev, numbers: !prev.numbers }))}
-                                        />
-                                        اقفال الخطوط
-                                    </label>
-                                    <label>
-                                        <input
-                                            type="checkbox"
-                                            checked={locks.money}
-                                            onChange={() => setLocks(prev => ({ ...prev, money: !prev.money }))}
-                                        />
-                                        اقفال المالية
-                                    </label>
-                                    <label>
-                                        <input
-                                            type="checkbox"
-                                            checked={locks.cash}
-                                            onChange={() => setLocks(prev => ({ ...prev, cash: !prev.cash }))}
-                                        />
-                                        اقفال النقدي
-                                    </label>
-                                    <label>
-                                        <input
-                                            type="checkbox"
-                                            checked={locks.daily}
-                                            onChange={() => setLocks(prev => ({ ...prev, daily: !prev.daily }))}
-                                        />
-                                        اقفال العمليات اليومية
-                                    </label>
-                                    <label>
-                                        <input
-                                            type="checkbox"
-                                            checked={locks.settings}
-                                            onChange={() => setLocks(prev => ({ ...prev, settings: !prev.settings }))}
-                                        />
-                                        اقفال الإعدادات
-                                    </label>
-                                    <label>
-                                        <input
-                                            type="checkbox"
-                                            checked={locks.debts}
-                                            onChange={() => setLocks(prev => ({ ...prev, debts: !prev.debts }))}
-                                        />
-                                        اقفال الديون
-                                    </label>
+                                    {Object.keys(locks).map(key => (
+                                        <label key={key}>
+                                            <input
+                                                type="checkbox"
+                                                checked={locks[key]}
+                                                onChange={() => setLocks(prev => ({ ...prev, [key]: !prev[key] }))}
+                                            />
+                                            {`اقفال ${key === 'numbers' ? 'الخطوط' : key}`}
+                                        </label>
+                                    ))}
                                 </div>
 
                                 <div className={styles.passwordInput}>
