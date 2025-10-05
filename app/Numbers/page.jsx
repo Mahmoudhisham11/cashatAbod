@@ -7,7 +7,7 @@ import { HiQrcode } from "react-icons/hi";
 import { FaTrashAlt } from "react-icons/fa";
 import { MdModeEditOutline } from "react-icons/md";
 import { db } from "../firebase";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, query, updateDoc, getDocs } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, onSnapshot, query, updateDoc, getDocs, getDoc } from "firebase/firestore";
 import QRCode from "react-qr-code";
 import { useRouter } from "next/navigation";
 
@@ -25,12 +25,17 @@ function Numbers() {
     const [openQr, setOpenQr] = useState(false);
     const [numbers, setNumbers] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const btns = ['اضف خط جديد','كل الخطوط'];
-
     const [authorized, setAuthorized] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [editId, setEditId] = useState(null); // ⭐ لتحديد إذا كنا في وضع تعديل
+    const [editId, setEditId] = useState(null);
+    const btns = ['اضف خط جديد','كل الخطوط'];
 
+    const [locks, setLocks] = useState({
+        numbers: false
+    });
+    const [lockPassword, setLockPassword] = useState('');
+
+    // 🔹 جلب المستخدم الحالي والتحقق من قفل الصفحة
     useEffect(() => {
         const checkLock = async () => {
             const email = localStorage.getItem("email");
@@ -41,48 +46,57 @@ function Numbers() {
             }
 
             const snapshot = await getDocs(collection(db, "users"));
+            const currentUserDoc = snapshot.docs.find(doc => doc.data().email === email);
 
-            if (!snapshot.empty) {
-                const userDoc = snapshot.docs[0];
-                const data = userDoc.data();
-
-                if (data.lockNumbers) {
-                    const input = prompt("🚫 تم قفل صفحة الخطوط\nمن فضلك أدخل كلمة المرور:");
-                    if (input === data.lockPassword) {
-                        setAuthorized(true);
-                    } else {
-                        alert("❌ كلمة المرور غير صحيحة");
-                        router.push('/');
-                    }
-                } else {
-                    setAuthorized(true);
-                }
-            } else {
+            if (!currentUserDoc) {
                 router.push('/');
+                return;
+            }
+
+            const userData = currentUserDoc.data();
+            setLocks({ numbers: userData.lockNumbers || false });
+
+            // تحقق كلمة المرور للقفل
+            if (userData.lockNumbers) {
+                let passwordToCheck = userData.lockPassword || "";
+                const passSnap = await getDoc(doc(db, "passwords", currentUserDoc.id));
+                if (passSnap.exists()) passwordToCheck = passSnap.data().lockPassword || passwordToCheck;
+
+                const input = prompt("🚫 تم قفل صفحة الخطوط\nمن فضلك أدخل كلمة المرور:");
+                if (input === passwordToCheck) setAuthorized(true);
+                else { alert("❌ كلمة المرور غير صحيحة"); router.push('/'); }
+            } else {
+                setAuthorized(true);
             }
 
             setLoading(false);
         };
 
         checkLock();
-    }, []);
+    }, [router]);
 
+    // 🔹 جلب الخطوط الخاصة بالمستخدم
     useEffect(() => {
         if (!userEmail) return;
-        const unsubscribe = onSnapshot(collection(db, 'numbers'), (querySnapshot) => {
+        const q = query(collection(db, 'numbers'));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const numbersSnap = [];
             querySnapshot.forEach((doc) => {
-                numbersSnap.push({...doc.data(), id: doc.id});
+                const data = doc.data();
+                if (data.userEmail === userEmail) {
+                    numbersSnap.push({...data, id: doc.id});
+                }
             });
             setNumbers(numbersSnap);
         });
         return () => unsubscribe();
     }, [userEmail]);
 
+    // 🔹 إعادة ضبط الليمت اليومي والشهري
     useEffect(() => {
         const resetLimitsIfNeeded = async () => {
             const today = new Date();
-            const todayDate =  today.toLocaleDateString('en-CA');
+            const todayDate = today.toLocaleDateString('en-CA');
             const currentMonth = today.getMonth();
 
             for (const number of numbers) {
@@ -106,58 +120,40 @@ function Numbers() {
             }
         };
 
-        if (numbers.length > 0) {
-            resetLimitsIfNeeded();
-        }
+        if (numbers.length > 0) resetLimitsIfNeeded();
     }, [numbers]);
 
     // ⭐ إضافة/تعديل خط
     const handelAddNumber = async () => {
-        if (phone !== "") {
-            if (editId) {
-                // تعديل
-                const docRef = doc(db, "numbers", editId);
-                await updateDoc(docRef, {
-                    phone,
-                    name,
-                    idNumber,
-                    amount,
-                    withdrawLimit: limit,
-                    depositLimit: limit,
-                    originalWithdrawLimit: limit,
-                    originalDepositLimit: limit,
-                    userEmail,
-                });
-                alert("تم تعديل البيانات بنجاح ✅");
-                setEditId(null);
-            } else {
-                // إضافة
-                await addDoc(collection(db, 'numbers'), {
-                    phone,
-                    name,
-                    idNumber,
-                    amount,
-                    withdrawLimit: limit,
-                    depositLimit: limit,
-                    originalWithdrawLimit: limit,
-                    originalDepositLimit: limit,
-                    dailyWithdraw: 60000,
-                    dailyDeposit: 60000,
-                    userEmail,
-                });
-                alert('تم اضافة الرقم بنجاح ✅');
-            }
+        if (!phone) return alert("⚠️ من فضلك ادخل رقم الخط");
+        if (!userEmail) return;
 
-            // مسح الفورم
-            setPhone('');
-            setName('');
-            setIdNumber('');
-            setAmount('');
-            setLimit('');
+        const data = {
+            phone,
+            name,
+            idNumber,
+            amount,
+            withdrawLimit: limit,
+            depositLimit: limit,
+            originalWithdrawLimit: limit,
+            originalDepositLimit: limit,
+            dailyWithdraw: 60000,
+            dailyDeposit: 60000,
+            userEmail,
+        };
+
+        if (editId) {
+            await updateDoc(doc(db, "numbers", editId), data);
+            alert("✅ تم تعديل البيانات");
+            setEditId(null);
+        } else {
+            await addDoc(collection(db, 'numbers'), data);
+            alert("✅ تم إضافة الخط بنجاح");
         }
+
+        setPhone(''); setName(''); setIdNumber(''); setAmount(''); setLimit('');
     };
 
-    // ⭐ تحميل بيانات الخط للتعديل
     const handleEdit = (number) => {
         setPhone(number.phone);
         setName(number.name);
@@ -165,7 +161,7 @@ function Numbers() {
         setAmount(number.amount);
         setLimit(number.originalWithdrawLimit || number.withdrawLimit);
         setEditId(number.id);
-        setActive(0); // يفتح فورم التعديل تلقائي
+        setActive(0);
     };
 
     const handleDelet = async (id) => {
@@ -178,22 +174,17 @@ function Numbers() {
     };
 
     const handleDeleteAll = async () => {
-        if (!confirm("هل أنت متأكد من حذف جميع البيانات؟ سيتم حذف الخطوط، العمليات، والتقارير.")) return;
-
-        const collectionsToDelete = ['numbers', 'operations', 'reports'];
-
-        for (const collectionName of collectionsToDelete) {
-            const querySnapshot = await getDocs(collection(db, collectionName));
-            const deletePromises = querySnapshot.docs.map((docSnap) => deleteDoc(doc(db, collectionName, docSnap.id)));
+        if (!confirm("هل أنت متأكد من حذف جميع البيانات؟")) return;
+        const collectionsToDelete = ['numbers','operations','reports'];
+        for (const col of collectionsToDelete) {
+            const snap = await getDocs(collection(db, col));
+            const deletePromises = snap.docs.map(d => deleteDoc(doc(db, col, d.id)));
             await Promise.all(deletePromises);
         }
-
-        alert("تم حذف كل البيانات بنجاح ✅");
+        alert("✅ تم حذف كل البيانات");
     };
 
-    const filteredNumbers = numbers.filter((number) =>
-        number.phone.includes(searchTerm)
-    );
+    const filteredNumbers = numbers.filter(n => n.phone.includes(searchTerm));
 
     if (loading) return <p>جاري التحقق...</p>;
     if (!authorized) return null;
@@ -201,73 +192,72 @@ function Numbers() {
     return (
         <div className="main">
             <div className={openQr ? `${styles.qrContainer} ${styles.active}` : `${styles.qrContainer}`}>
-                <button onClick={() => setOpenQr(false)}><MdOutlineKeyboardArrowLeft/></button>
+                <button onClick={()=>setOpenQr(false)}><MdOutlineKeyboardArrowLeft/></button>
                 <QRCode value={qrNumber} size={200} />
                 <h2>{qrNumber}</h2>
             </div>
+
             <div className={styles.numbersContainer}>
                 <div className="header">
                     <h2>الارقام و الليمت</h2>
                     <Link href={"/"} className="headerLink"><MdOutlineKeyboardArrowLeft /></Link>
                 </div>
+
                 <div className={styles.content}>
                     <div className={styles.btnsContainer}>
-                        {btns.map((btn, index) => (
-                            <button className={active === index ? `${styles.active}` : ``} onClick={() => setActive(index)} key={index}>{btn}</button>
-                        ))}
+                        {btns.map((btn,index)=>
+                            <button key={index} className={active===index?`${styles.active}`:""} onClick={()=>setActive(index)}>{btn}</button>
+                        )}
                         <button className={styles.deleteAll} onClick={handleDeleteAll}><FaTrashAlt/></button>
                     </div>
-                    <div className={styles.cardInfo} style={{display: active === 0 ? 'flex' : 'none'}}>
+
+                    <div className={styles.cardInfo} style={{display: active===0?"flex":"none"}}>
                         <div className={styles.info}>
                             <div className="inputContainer">
                                 <label>رقم الخط : </label>
-                                <input type="number" value={phone} placeholder="اضف رقم الخط" onChange={(e) => setPhone(e.target.value)}/>
+                                <input type="number" value={phone} placeholder="اضف رقم الخط" onChange={(e)=>setPhone(e.target.value)}/>
                             </div>
                             <div className="amounts">
                                 <div className="inputContainer">
                                     <label>اسم المالك :</label>
-                                    <input type="text" value={name} placeholder="اضف اسم مالك الخط" onChange={(e) => setName(e.target.value)}/>
+                                    <input type="text" value={name} placeholder="اضف اسم مالك الخط" onChange={(e)=>setName(e.target.value)}/>
                                 </div>
                                 <div className="inputContainer">
                                     <label>الرقم القومي :</label>
-                                    <input type="number" value={idNumber} placeholder="اضف الرقم القومي" onChange={(e) => setIdNumber(e.target.value)}/>
+                                    <input type="number" value={idNumber} placeholder="اضف الرقم القومي" onChange={(e)=>setIdNumber(e.target.value)}/>
                                 </div>
                             </div>
                             <div className="amounts">
                                 <div className="inputContainer">
                                     <label> رصيد الخط :</label>
-                                    <input type="number" value={amount} placeholder="0" onChange={(e) => setAmount(e.target.value)}/>
+                                    <input type="number" value={amount} placeholder="0" onChange={(e)=>setAmount(e.target.value)}/>
                                 </div>
                                 <div className="inputContainer">
                                     <label> الليمت :</label>
-                                    <input type="number" value={limit} placeholder="0" onChange={(e) => setLimit(e.target.value)}/>
+                                    <input type="number" value={limit} placeholder="0" onChange={(e)=>setLimit(e.target.value)}/>
                                 </div>
                             </div>
                         </div>
                         <button className={styles.addBtn} onClick={handelAddNumber}>
-                            {editId ? "تعديل البيانات" : "اكمل العملية"}
+                            {editId?"تعديل البيانات":"اكمل العملية"}
                         </button>
                     </div>
-                    <div className={styles.cardContent} style={{display: active === 1 ? 'flex' : 'none'}}>
+
+                    <div className={styles.cardContent} style={{display: active===1?"flex":"none"}}>
                         <div className="inputContainer">
-                            <input
-                                type="text"
-                                placeholder="ابحث عن رقم"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+                            <input type="text" placeholder="ابحث عن رقم" value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)}/>
                         </div>
-                        {filteredNumbers.map((number, index) => (
-                            <div key={number.id} onClick={() => setOpenCard(openCard === index ? null : index)} className={openCard === index ? `${styles.numDiv} ${styles.open}` : `${styles.numDiv}`}>
+                        {filteredNumbers.map((number,index)=>(
+                            <div key={number.id} onClick={()=>setOpenCard(openCard===index?null:index)} className={openCard===index?`${styles.numDiv} ${styles.open}`:`${styles.numDiv}`}>
                                 <div className={styles.divHeader}>
                                     <h2>{number.phone}</h2>
                                     <div className={styles.btns}>
-                                        <button onClick={() => handleQr(number.phone)}><HiQrcode/></button>
-                                        <button onClick={() => handleEdit(number)}><MdModeEditOutline/></button>
-                                        <button onClick={() => handleDelet(number.id)}><FaTrashAlt/></button>
+                                        <button onClick={()=>handleQr(number.phone)}><HiQrcode/></button>
+                                        <button onClick={()=>handleEdit(number)}><MdModeEditOutline/></button>
+                                        <button onClick={()=>handleDelet(number.id)}><FaTrashAlt/></button>
                                     </div>
                                 </div>
-                                <hr />
+                                <hr/>
                                 <div className={styles.divFooter}>
                                     <strong>اسم المالك : {number.name}</strong>
                                     <strong>الرقم القومي: {number.idNumber}</strong>

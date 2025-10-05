@@ -4,44 +4,32 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { MdOutlineKeyboardArrowLeft, MdModeEditOutline } from "react-icons/md";
 import { FaRegMoneyBillAlt, FaTimes } from "react-icons/fa";
-import {
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  deleteDoc,
-  doc,
-  updateDoc,
-} from "firebase/firestore";
+import { collection, addDoc, getDocs, query, deleteDoc, doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "../firebase";
-
-// Excel
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import { useRouter } from "next/navigation";
 
 function Debts() {
+  const router = useRouter();
+
+  // 🔹 حالة القفل والصلاحية
+  const [authorized, setAuthorized] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // بيانات الصفحة
   const btns = ["اضف عميل جديد", "كل العملاء"];
   const [active, setActive] = useState(0);
-
-  // بيانات الفورم
   const [clientName, setClientName] = useState("");
   const [amount, setAmount] = useState("");
   const [debtType, setDebtType] = useState("ليك");
   const [payMethod, setPayMethod] = useState("نقدي");
   const [walletId, setWalletId] = useState("");
-
-  // بيانات الديون
   const [debts, setDebts] = useState([]);
   const [editId, setEditId] = useState(null);
-
-  // مجموعات
   const [totalLik, setTotalLik] = useState(0);
   const [totalAlyek, setTotalAlyek] = useState(0);
-
-  // المستخدم
   const [userEmail, setUserEmail] = useState("");
-
-  // المحافظ والنقدي
   const [wallets, setWallets] = useState([]);
   const [cashVal, setCashVal] = useState(0);
 
@@ -52,28 +40,64 @@ function Debts() {
   const [payType, setPayType] = useState("نقدي");
   const [selectedWallet, setSelectedWallet] = useState("");
 
+  // 🔹 التحقق من صلاحية الدخول (قفل الديون)
   useEffect(() => {
-    const email = localStorage.getItem("email");
-    if (email) setUserEmail(email);
-  }, []);
+    const checkLock = async () => {
+      const email = localStorage.getItem("email");
+      if (!email) {
+        router.push('/');
+        return;
+      }
+      setUserEmail(email);
 
+      const snapshot = await getDocs(collection(db, "users"));
+      const currentUserDoc = snapshot.docs.find(doc => doc.data().email === email);
+
+      if (!currentUserDoc) {
+        router.push('/');
+        return;
+      }
+
+      const data = currentUserDoc.data();
+      if (data.lockDebts) {
+        let passwordToCheck = data.lockPassword || "";
+        const passSnap = await getDoc(doc(db, "passwords", currentUserDoc.id));
+        if (passSnap.exists()) passwordToCheck = passSnap.data().lockPassword || passwordToCheck;
+
+        const input = prompt("🚫 تم قفل صفحة الديون\nمن فضلك أدخل كلمة المرور:");
+        if (input === passwordToCheck) {
+          setAuthorized(true);
+        } else {
+          alert("❌ كلمة المرور غير صحيحة");
+          router.push('/');
+          return;
+        }
+      } else {
+        setAuthorized(true);
+      }
+      setLoading(false);
+    };
+
+    checkLock();
+  }, [router]);
+
+  // 🔹 تحميل البيانات بعد التحقق
   useEffect(() => {
-    if (!userEmail) return;
+    if (!authorized || !userEmail) return;
     fetchDebts();
     fetchWallets();
     fetchCash();
-  }, [userEmail]);
+  }, [authorized, userEmail]);
 
   const fetchDebts = async () => {
-    if (!userEmail) return;
     try {
       const q = query(collection(db, "debts"));
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setDebts(data);
 
       let lik = 0, alyek = 0;
-      data.forEach((d) => {
+      data.forEach(d => {
         const val = Number(d.amount) || 0;
         if (d.debtType === "ليك") lik += val;
         else alyek += val;
@@ -87,8 +111,7 @@ function Debts() {
     try {
       const q = query(collection(db, "numbers"));
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setWallets(data);
+      setWallets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (error) { console.error(error); }
   };
 
@@ -97,7 +120,7 @@ function Debts() {
       const q = query(collection(db, "cash"));
       const snapshot = await getDocs(q);
       let totalCash = 0;
-      snapshot.forEach((docSnap) => { totalCash += Number(docSnap.data().cashVal || 0); });
+      snapshot.forEach(docSnap => totalCash += Number(docSnap.data().cashVal || 0));
       setCashVal(totalCash);
     } catch (error) { console.error(error); }
   };
@@ -153,7 +176,7 @@ function Debts() {
     setActive(0);
   };
 
-  const openPayPopup = (debt) => {
+  const openPayPopupFunc = (debt) => {
     setSelectedDebt(debt);
     setPayAmount("");
     setPayType("نقدي");
@@ -165,7 +188,6 @@ function Debts() {
     if (!payAmount || Number(payAmount)<=0) { alert("⚠️ ادخل قيمة صحيحة"); return; }
     const amt = Number(payAmount);
     try {
-      // تحديث النقدي أو المحفظة
       if (payType === "نقدي") {
         const cashSnap = await getDocs(collection(db, "cash"));
         if (!cashSnap.empty) {
@@ -182,7 +204,6 @@ function Debts() {
         fetchWallets();
       }
 
-      // تحديث الدين
       const debtRef = doc(db,"debts",selectedDebt.id);
       if (amt<selectedDebt.amount) {
         await updateDoc(debtRef,{amount:selectedDebt.amount-amt});
@@ -212,6 +233,9 @@ function Debts() {
     const dataBlob = new Blob([excelBuffer],{type:"application/octet-stream"});
     saveAs(dataBlob,`الديون_${new Date().toLocaleDateString("ar-EG")}.xlsx`);
   };
+
+  if (loading) return <p>جاري التحقق من الصلاحية...</p>;
+  if (!authorized) return null;
 
   return (
     <div className={styles.debts}>
@@ -304,7 +328,7 @@ function Debts() {
                     <td>{d.date}</td>
                     <td className={styles.actions}>
                       <button onClick={()=>handleEdit(d)}><MdModeEditOutline/></button>
-                      <button onClick={()=>openPayPopup(d)}><FaRegMoneyBillAlt/></button>
+                      <button onClick={()=>openPayPopupFunc(d)}><FaRegMoneyBillAlt/></button>
                     </td>
                   </tr>
                 ))}
