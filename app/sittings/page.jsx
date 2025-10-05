@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import CashPop from "../../components/CashPop/page";
 import Developer from "../../components/Developer/page";
 import { db } from "../../app/firebase";
-import { collection, doc, getDoc, getDocs, updateDoc, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
 
 function Sittings() {
     const router = useRouter();
@@ -31,12 +31,10 @@ function Sittings() {
         settings: false,
         debts: false
     });
-    const [lockPassword, setLockPassword] = useState("");
-
     const [authorized, setAuthorized] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // 🔹 التحقق من صلاحية الدخول لصفحة الإعدادات
+    // 🔹 التحقق من صلاحية الدخول لصفحة الإعدادات بدون باسورد
     useEffect(() => {
         const checkLock = async () => {
             const email = localStorage.getItem("email");
@@ -55,26 +53,14 @@ function Sittings() {
 
             const data = currentUserDoc.data();
 
-            // التحقق من كلمة مرور الإعدادات
+            // لو المستخدم عنده صلاحية lockSettings = true، يمنع الدخول
             if (data.lockSettings) {
-                let passwordToCheck = data.lockPassword || "";
-                // تحقق إذا موجود كلمة المرور في collection passwords
-                const passSnap = await getDoc(doc(db, "passwords", currentUserDoc.id));
-                if (passSnap.exists()) {
-                    passwordToCheck = passSnap.data().lockPassword || passwordToCheck;
-                }
-
-                const input = prompt("🚫 تم قفل صفحة الإعدادات\nمن فضلك أدخل كلمة المرور:");
-                if (input === passwordToCheck) {
-                    setAuthorized(true);
-                } else {
-                    alert("❌ كلمة المرور غير صحيحة");
-                    router.push('/');
-                }
-            } else {
-                setAuthorized(true);
+                alert("🚫 ليس لديك صلاحية لدخول الصفحة");
+                router.push('/');
+                return;
             }
 
+            setAuthorized(true);
             setLoading(false);
         };
 
@@ -99,7 +85,7 @@ function Sittings() {
         fetchUsers();
     }, []);
 
-    // 🔹 تحميل صلاحيات وكلمة مرور المستخدم المختار
+    // 🔹 تحميل صلاحيات المستخدم المختار
     useEffect(() => {
         if (!selectedUserId) return;
 
@@ -117,19 +103,6 @@ function Sittings() {
                     debts: data.lockDebts || false,
                 });
             }
-
-            const passSnap = await getDoc(doc(db, "passwords", selectedUserId));
-            if (passSnap.exists()) {
-                const passData = passSnap.data();
-                setLockPassword(passData.lockPassword || "");
-                if (userSnap.exists() && passData.lockPassword !== userSnap.data().lockPassword) {
-                    await updateDoc(doc(db, "users", selectedUserId), {
-                        lockPassword: passData.lockPassword
-                    });
-                }
-            } else {
-                setLockPassword(""); 
-            }
         };
 
         fetchUserData();
@@ -143,7 +116,7 @@ function Sittings() {
         }
     };
 
-    // 🔹 تحديث الصلاحيات وكلمة المرور
+    // 🔹 تحديث الصلاحيات بدون باسورد
     const handleLockUpdate = async () => {
         if (!selectedUserId) {
             alert("⚠️ من فضلك اختر مستخدم أولاً");
@@ -158,20 +131,11 @@ function Sittings() {
             lockCash: locks.cash,
             lockDaily: locks.daily,
             lockSettings: locks.settings,
-            lockDebts: locks.debts,
-            lockPassword: lockPassword 
+            lockDebts: locks.debts
         };
         await updateDoc(userRef, updateData);
 
-        const passRef = doc(db, "passwords", selectedUserId);
-        const passSnap = await getDoc(passRef);
-        if (passSnap.exists()) {
-            await updateDoc(passRef, { lockPassword: lockPassword });
-        } else {
-            await setDoc(passRef, { lockPassword: lockPassword });
-        }
-
-        alert("✅ تم تحديث صلاحيات وكلمة مرور المستخدم");
+        alert("✅ تم تحديث صلاحيات المستخدم");
         setOpenPermissions(false);
     };
 
@@ -213,16 +177,6 @@ function Sittings() {
                                             {`اقفال ${key === 'numbers' ? 'الخطوط' : key}`}
                                         </label>
                                     ))}
-                                </div>
-
-                                <div className={styles.passwordInput}>
-                                    <label>كلمة مرور القفل:</label>
-                                    <input
-                                        type="password"
-                                        value={lockPassword}
-                                        onChange={(e) => setLockPassword(e.target.value)}
-                                        placeholder="ادخل كلمة المرور"
-                                    />
                                 </div>
 
                                 <button className={styles.saveBtn} onClick={handleLockUpdate}>

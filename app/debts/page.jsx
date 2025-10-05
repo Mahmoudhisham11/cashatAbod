@@ -60,21 +60,12 @@ function Debts() {
 
       const data = currentUserDoc.data();
       if (data.lockDebts) {
-        let passwordToCheck = data.lockPassword || "";
-        const passSnap = await getDoc(doc(db, "passwords", currentUserDoc.id));
-        if (passSnap.exists()) passwordToCheck = passSnap.data().lockPassword || passwordToCheck;
-
-        const input = prompt("🚫 تم قفل صفحة الديون\nمن فضلك أدخل كلمة المرور:");
-        if (input === passwordToCheck) {
-          setAuthorized(true);
-        } else {
-          alert("❌ كلمة المرور غير صحيحة");
-          router.push('/');
-          return;
-        }
-      } else {
-        setAuthorized(true);
+        alert("🚫 ليس لديك صلاحية الدخول إلى صفحة الديون.");
+        router.push('/');
+        return;
       }
+
+      setAuthorized(true);
       setLoading(false);
     };
 

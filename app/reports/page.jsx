@@ -48,14 +48,9 @@ function Reports() {
       if (!snapshot.empty) {
         const user = snapshot.docs[0].data();
         if (user.lockReports) {
-          const pass = prompt("🔐 تم قفل صفحة التقارير\nادخل كلمة المرور:");
-          if (pass === user.lockPassword) {
-            setAuthorized(true);
-          } else {
-            alert("❌ كلمة المرور غير صحيحة");
-            router.push('/');
-            return;
-          }
+          alert("❌ مالكش صلاحية الدخول للصفحة");
+          router.push('/');
+          return;
         } else {
           setAuthorized(true);
         }

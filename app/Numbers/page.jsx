@@ -7,7 +7,7 @@ import { HiQrcode } from "react-icons/hi";
 import { FaTrashAlt } from "react-icons/fa";
 import { MdModeEditOutline } from "react-icons/md";
 import { db } from "../firebase";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, query, updateDoc, getDocs, getDoc } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, onSnapshot, query, updateDoc, getDocs } from "firebase/firestore";
 import QRCode from "react-qr-code";
 import { useRouter } from "next/navigation";
 
@@ -30,12 +30,7 @@ function Numbers() {
     const [editId, setEditId] = useState(null);
     const btns = ['اضف خط جديد','كل الخطوط'];
 
-    const [locks, setLocks] = useState({
-        numbers: false
-    });
-    const [lockPassword, setLockPassword] = useState('');
-
-    // 🔹 جلب المستخدم الحالي والتحقق من قفل الصفحة
+    // 🔹 جلب المستخدم الحالي والتحقق من الصلاحية
     useEffect(() => {
         const checkLock = async () => {
             const email = localStorage.getItem("email");
@@ -54,17 +49,11 @@ function Numbers() {
             }
 
             const userData = currentUserDoc.data();
-            setLocks({ numbers: userData.lockNumbers || false });
 
-            // تحقق كلمة المرور للقفل
             if (userData.lockNumbers) {
-                let passwordToCheck = userData.lockPassword || "";
-                const passSnap = await getDoc(doc(db, "passwords", currentUserDoc.id));
-                if (passSnap.exists()) passwordToCheck = passSnap.data().lockPassword || passwordToCheck;
-
-                const input = prompt("🚫 تم قفل صفحة الخطوط\nمن فضلك أدخل كلمة المرور:");
-                if (input === passwordToCheck) setAuthorized(true);
-                else { alert("❌ كلمة المرور غير صحيحة"); router.push('/'); }
+                alert("🚫 لا تملك صلاحية الدخول لهذه الصفحة");
+                router.push('/');
+                return;
             } else {
                 setAuthorized(true);
             }
