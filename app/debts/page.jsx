@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { MdOutlineKeyboardArrowLeft, MdModeEditOutline } from "react-icons/md";
 import { FaRegMoneyBillAlt, FaTimes } from "react-icons/fa";
-import { collection, addDoc, getDocs, query, deleteDoc, doc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -116,6 +116,7 @@ function Debts() {
     } catch (error) { console.error(error); }
   };
 
+  // 🔹 تسجيل الدين (مع التعديل الجديد)
   const handleSubmit = async () => {
     if (!userEmail) return;
     if (!clientName || !amount) { alert("⚠️ من فضلك املأ جميع الحقول"); return; }
@@ -126,22 +127,45 @@ function Debts() {
         if (!cashSnap.empty) {
           const cashDocId = cashSnap.docs[0].id;
           const cashData = cashSnap.docs[0].data();
-          const newCash = Number(cashData.cashVal || 0) - debtAmount;
+          let newCash = Number(cashData.cashVal || 0);
+
+          if (debtType === "ليك") {
+            newCash -= debtAmount; // الدين ليك → فلوسك تقل
+          } else {
+            newCash += debtAmount; // الدين عليك → فلوسك تزيد
+          }
+
           await updateDoc(doc(db, "cash", cashDocId), { cashVal: newCash });
           setCashVal(newCash);
         }
       } else if (payMethod === "محفظة" && walletId) {
         const walletRef = doc(db, "numbers", walletId);
         const walletDoc = wallets.find((w) => w.id === walletId);
-        const newAmount = Number(walletDoc.amount || 0) - debtAmount;
+        let newAmount = Number(walletDoc.amount || 0);
+
+        if (debtType === "ليك") {
+          newAmount -= debtAmount;
+        } else {
+          newAmount += debtAmount;
+        }
+
         await updateDoc(walletRef, { amount: newAmount });
         fetchWallets();
       }
 
+      const walletPhone = payMethod === "محفظة" && walletId 
+        ? wallets.find(w=>w.id===walletId)?.phone || "" 
+        : null;
+
       const debtData = {
-        clientName, amount: debtAmount, debtType,
-        payMethod, walletId: payMethod==="محفظة"?walletId:null,
-        userEmail, date: new Date().toLocaleDateString("ar-EG")
+        clientName, 
+        amount: debtAmount, 
+        debtType,
+        payMethod, 
+        walletId: payMethod==="محفظة"?walletId:null,
+        walletPhone: walletPhone,
+        userEmail, 
+        date: new Date().toLocaleString("ar-EG")
       };
 
       if (editId) {
@@ -175,6 +199,7 @@ function Debts() {
     setShowPayPopup(true);
   };
 
+  // 🔹 تعديل السداد حسب نوع الدين
   const handlePay = async () => {
     if (!payAmount || Number(payAmount)<=0) { alert("⚠️ ادخل قيمة صحيحة"); return; }
     const amt = Number(payAmount);
@@ -184,13 +209,28 @@ function Debts() {
         if (!cashSnap.empty) {
           const cashDocId = cashSnap.docs[0].id;
           const cashData = cashSnap.docs[0].data();
-          await updateDoc(doc(db, "cash", cashDocId), { cashVal: Number(cashData.cashVal||0)+amt });
-          setCashVal(Number(cashData.cashVal||0)+amt);
+          let updatedCash = Number(cashData.cashVal||0);
+
+          if (selectedDebt.debtType === "ليك") {
+            updatedCash += amt; // سداد دين ليك → تزود الكاش
+          } else {
+            updatedCash -= amt; // سداد دين عليك → تخصم من الكاش
+          }
+
+          await updateDoc(doc(db, "cash", cashDocId), { cashVal: updatedCash });
+          setCashVal(updatedCash);
         }
       } else if (payType==="محفظة" && selectedWallet) {
         const walletRef = doc(db, "numbers", selectedWallet);
         const walletDoc = wallets.find(w=>w.id===selectedWallet);
-        const newAmount = Number(walletDoc.amount||0)+amt;
+        let newAmount = Number(walletDoc.amount||0);
+
+        if (selectedDebt.debtType === "ليك") {
+          newAmount += amt; 
+        } else {
+          newAmount -= amt; 
+        }
+
         await updateDoc(walletRef,{amount:newAmount});
         fetchWallets();
       }
@@ -212,7 +252,7 @@ function Debts() {
       "اسم العميل": d.clientName,
       "المبلغ": d.amount,
       "النوع": d.debtType,
-      "طريقة الدفع": d.payMethod||"",
+      "طريقة الدفع": d.payMethod==="محفظة" ? `محفظة - ${d.walletPhone||""}` : "نقدي",
       "التاريخ": d.date,
     }));
     data.push({}); data.push({"اسم العميل":"الإجمالي ليك","المبلغ":totalLik});
@@ -291,7 +331,6 @@ function Debts() {
             <div className={styles.totals}>
               <strong>ليك: {totalLik} ج.م</strong>
               <strong>عليك: {totalAlyek} ج.م</strong>
-              <strong>نقدي: {cashVal} ج.م</strong>
             </div>
             <div className={styles.headBtns}>
               <button onClick={exportToExcel}>Excel</button>
@@ -315,7 +354,7 @@ function Debts() {
                     <td>{d.clientName}</td>
                     <td>{d.amount} ج.م</td>
                     <td>{d.debtType}</td>
-                    <td>{d.payMethod||"نقدي"}</td>
+                    <td>{d.payMethod==="محفظة" ? `محفظة - ${d.walletPhone||""}` : "نقدي"}</td>
                     <td>{d.date}</td>
                     <td className={styles.actions}>
                       <button onClick={()=>handleEdit(d)}><MdModeEditOutline/></button>

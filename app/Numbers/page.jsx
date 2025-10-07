@@ -66,20 +66,18 @@ function Numbers() {
 
     // 🔹 جلب الخطوط الخاصة بالمستخدم
     useEffect(() => {
-        if (!userEmail) return;
         const q = query(collection(db, 'numbers'));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const numbersSnap = [];
             querySnapshot.forEach((doc) => {
                 const data = doc.data();
-                if (data.userEmail === userEmail) {
-                    numbersSnap.push({...data, id: doc.id});
-                }
+                numbersSnap.push({ ...data, id: doc.id });
             });
             setNumbers(numbersSnap);
         });
         return () => unsubscribe();
-    }, [userEmail]);
+    }, []);
+
 
     // 🔹 إعادة ضبط الليمت اليومي والشهري
     useEffect(() => {

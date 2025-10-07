@@ -38,7 +38,6 @@
     border: none;
     color: var(--text-color);
     font-size: 20px;
-
 }
 .balanceContainer {
     width: 100%;
@@ -115,13 +114,32 @@
     border: none;
     cursor: pointer;
 }
+
+/* ✅ تعديل الجزء الخاص بالجدول */
 .operations {
     width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     padding: 30px 0;
+    overflow-x: auto;   /* يخلي الجدول يعمل scroll يمين/شمال */
 }
+
+.operations table {
+    width: max-content; /* الجدول ياخد عرض الأعمدة كلها */
+    min-width: 100%;    /* ما يبقاش أصغر من الشاشة */
+    border-collapse: collapse;
+}
+
+/* خلي الـ scroll يبقى شكله أنعم */
+.operations::-webkit-scrollbar {
+    height: 6px;
+}
+.operations::-webkit-scrollbar-thumb {
+    background: #aaa;
+    border-radius: 5px;
+}
+.operations::-webkit-scrollbar-track {
+    background: transparent;
+}
+
 .action {
     background-color: transparent;
     color: red;
@@ -130,7 +148,7 @@
     cursor: pointer;
 }
 
-
+/* media query للموبايل */
 @media(max-width: 767px) {
     .title h2 {
         font-size: 20px;
@@ -146,7 +164,4 @@
     .contentTitle h2 {
         font-size: 20px;
     }   
-    .operations {
-        overflow: scroll;
-    }
 }
