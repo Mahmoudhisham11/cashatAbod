@@ -98,14 +98,28 @@
 }
 .tableContainer {
     width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    overflow: scroll;
+    padding: 30px 0;
+    overflow-x: auto;   /* يخلي الجدول يعمل scroll يمين/شمال */
 }
+
+.tableContainer table {
+    width: max-content; /* الجدول ياخد عرض الأعمدة كلها */
+    min-width: 100%;    /* ما يبقاش أصغر من الشاشة */
+    border-collapse: collapse;
+}
+
+/* خلي الـ scroll يبقى شكله أنعم */
 .tableContainer::-webkit-scrollbar {
-    display: none;
+    height: 6px;
 }
+.tableContainer::-webkit-scrollbar-thumb {
+    background: #aaa;
+    border-radius: 5px;
+}
+.tableContainer::-webkit-scrollbar-track {
+    background: transparent;
+}
+
 .actions {
     display: flex;
     justify-content: center;

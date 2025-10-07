@@ -116,7 +116,7 @@ function Debts() {
     } catch (error) { console.error(error); }
   };
 
-  // 🔹 تسجيل الدين (مع التعديل الجديد)
+  // 🔹 تسجيل الدين (مع الحماية من السالب)
   const handleSubmit = async () => {
     if (!userEmail) return;
     if (!clientName || !amount) { alert("⚠️ من فضلك املأ جميع الحقول"); return; }
@@ -130,9 +130,14 @@ function Debts() {
           let newCash = Number(cashData.cashVal || 0);
 
           if (debtType === "ليك") {
-            newCash -= debtAmount; // الدين ليك → فلوسك تقل
+            newCash -= debtAmount;
           } else {
-            newCash += debtAmount; // الدين عليك → فلوسك تزيد
+            newCash += debtAmount;
+          }
+
+          if (newCash < 0) {
+            alert("⚠️رصيد المحفظة لا يكفي");
+            return;
           }
 
           await updateDoc(doc(db, "cash", cashDocId), { cashVal: newCash });
@@ -149,6 +154,11 @@ function Debts() {
           newAmount += debtAmount;
         }
 
+        if (newAmount < 0) {
+          alert("⚠️ رصيد المحفظة لا يكفي");
+          return;
+        }
+
         await updateDoc(walletRef, { amount: newAmount });
         fetchWallets();
       }
@@ -158,7 +168,8 @@ function Debts() {
         : null;
 
       const debtData = {
-        clientName, 
+        clientName,
+        userName: localStorage.getItem('name'), 
         amount: debtAmount, 
         debtType,
         payMethod, 
@@ -199,7 +210,7 @@ function Debts() {
     setShowPayPopup(true);
   };
 
-  // 🔹 تعديل السداد حسب نوع الدين
+  // 🔹 تعديل السداد (مع الحماية من السالب)
   const handlePay = async () => {
     if (!payAmount || Number(payAmount)<=0) { alert("⚠️ ادخل قيمة صحيحة"); return; }
     const amt = Number(payAmount);
@@ -212,9 +223,14 @@ function Debts() {
           let updatedCash = Number(cashData.cashVal||0);
 
           if (selectedDebt.debtType === "ليك") {
-            updatedCash += amt; // سداد دين ليك → تزود الكاش
+            updatedCash += amt; 
           } else {
-            updatedCash -= amt; // سداد دين عليك → تخصم من الكاش
+            updatedCash -= amt; 
+          }
+
+          if (updatedCash < 0) {
+            alert("⚠️ رصيد المحفظة لا يكفي");
+            return;
           }
 
           await updateDoc(doc(db, "cash", cashDocId), { cashVal: updatedCash });
@@ -229,6 +245,11 @@ function Debts() {
           newAmount += amt; 
         } else {
           newAmount -= amt; 
+        }
+
+        if (newAmount < 0) {
+          alert("⚠️ رصيد المحفظة لا يكفي");
+          return;
         }
 
         await updateDoc(walletRef,{amount:newAmount});
@@ -340,6 +361,7 @@ function Debts() {
             <table>
               <thead>
                 <tr>
+                  <th>المستخدم</th>
                   <th>اسم العميل</th>
                   <th>المبلغ</th>
                   <th>النوع</th>
@@ -351,6 +373,7 @@ function Debts() {
               <tbody>
                 {debts.map(d=>(
                   <tr key={d.id}>
+                    <td>{d.userName}</td>
                     <td>{d.clientName}</td>
                     <td>{d.amount} ج.م</td>
                     <td>{d.debtType}</td>
