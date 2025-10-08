@@ -70,6 +70,12 @@
     align-items: start;
     flex-direction: column;
 }
+.headBtns {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
 .headBtns button {
     width: 55px;
     height: 40px;
@@ -79,13 +85,26 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    background-color: rgba(122, 255, 122, 0.37);
-    color: rgb(2, 145, 2);
     transition: .3s;
     cursor: pointer;
 }
-.headBtns button:hover {
+.headBtns button:first-child {
+  background-color: rgba(122, 255, 122, 0.37);
+  color: rgb(2, 145, 2);
+}
+.headBtns button:first-child:hover {
     background-color: green;
+    color: white;
+}
+.headBtns button:last-child {
+  width: fit-content;
+  white-space: nowrap;
+  padding: 5px;
+  background-color: rgba(255, 114, 114, 0.514);
+  color: red;
+}
+.headBtns button:last-child:hover {
+    background-color: red;
     color: white;
 }
 .debtsContent {

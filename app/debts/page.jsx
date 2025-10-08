@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { MdOutlineKeyboardArrowLeft, MdModeEditOutline } from "react-icons/md";
 import { FaRegMoneyBillAlt, FaTimes } from "react-icons/fa";
-import { collection, addDoc, getDocs, query, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -13,11 +13,9 @@ import { useRouter } from "next/navigation";
 function Debts() {
   const router = useRouter();
 
-  // 🔹 حالة القفل والصلاحية
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // بيانات الصفحة
   const btns = ["اضف عميل جديد", "كل العملاء"];
   const [active, setActive] = useState(0);
   const [clientName, setClientName] = useState("");
@@ -33,14 +31,12 @@ function Debts() {
   const [wallets, setWallets] = useState([]);
   const [cashVal, setCashVal] = useState(0);
 
-  // popup السداد
   const [showPayPopup, setShowPayPopup] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState(null);
   const [payAmount, setPayAmount] = useState("");
   const [payType, setPayType] = useState("نقدي");
   const [selectedWallet, setSelectedWallet] = useState("");
 
-  // 🔹 التحقق من صلاحية الدخول (قفل الديون)
   useEffect(() => {
     const checkLock = async () => {
       const email = localStorage.getItem("email");
@@ -72,7 +68,6 @@ function Debts() {
     checkLock();
   }, [router]);
 
-  // 🔹 تحميل البيانات بعد التحقق
   useEffect(() => {
     if (!authorized || !userEmail) return;
     fetchDebts();
@@ -90,8 +85,8 @@ function Debts() {
       let lik = 0, alyek = 0;
       data.forEach(d => {
         const val = Number(d.amount) || 0;
-        if (d.debtType === "ليك") lik += val;
-        else alyek += val;
+        if (d.debtType === "ليك" && d.status !== "تم السداد") lik += val;
+        else if (d.debtType === "عليك" && d.status !== "تم السداد") alyek += val;
       });
       setTotalLik(lik);
       setTotalAlyek(alyek);
@@ -116,7 +111,6 @@ function Debts() {
     } catch (error) { console.error(error); }
   };
 
-  // 🔹 تسجيل الدين (مع الحماية من السالب)
   const handleSubmit = async () => {
     if (!userEmail) return;
     if (!clientName || !amount) { alert("⚠️ من فضلك املأ جميع الحقول"); return; }
@@ -176,7 +170,8 @@ function Debts() {
         walletId: payMethod==="محفظة"?walletId:null,
         walletPhone: walletPhone,
         userEmail, 
-        date: new Date().toLocaleString("ar-EG")
+        date: new Date().toLocaleString("ar-EG"),
+        status: "لم يتم السداد"
       };
 
       if (editId) {
@@ -210,7 +205,6 @@ function Debts() {
     setShowPayPopup(true);
   };
 
-  // 🔹 تعديل السداد (مع الحماية من السالب)
   const handlePay = async () => {
     if (!payAmount || Number(payAmount)<=0) { alert("⚠️ ادخل قيمة صحيحة"); return; }
     const amt = Number(payAmount);
@@ -260,7 +254,7 @@ function Debts() {
       if (amt<selectedDebt.amount) {
         await updateDoc(debtRef,{amount:selectedDebt.amount-amt});
       } else {
-        await deleteDoc(debtRef);
+        await updateDoc(debtRef,{amount:0,status:"تم السداد"});
       }
 
       fetchDebts();
@@ -274,6 +268,7 @@ function Debts() {
       "المبلغ": d.amount,
       "النوع": d.debtType,
       "طريقة الدفع": d.payMethod==="محفظة" ? `محفظة - ${d.walletPhone||""}` : "نقدي",
+      "الحالة": d.status,
       "التاريخ": d.date,
     }));
     data.push({}); data.push({"اسم العميل":"الإجمالي ليك","المبلغ":totalLik});
@@ -284,6 +279,21 @@ function Debts() {
     const excelBuffer = XLSX.write(workbook,{bookType:"xlsx",type:"array"});
     const dataBlob = new Blob([excelBuffer],{type:"application/octet-stream"});
     saveAs(dataBlob,`الديون_${new Date().toLocaleDateString("ar-EG")}.xlsx`);
+  };
+
+  // 🔹 زرار حذف المسدد
+  const deletePaidDebts = async () => {
+    if (!window.confirm("⚠️ هل أنت متأكد من حذف كل الديون المسددة؟")) return;
+    try {
+      const q = query(collection(db,"debts"));
+      const snapshot = await getDocs(q);
+      const paidDebts = snapshot.docs.filter(d=>d.data().status==="تم السداد");
+      for (const d of paidDebts) {
+        await deleteDoc(doc(db,"debts",d.id));
+      }
+      alert("✅ تم حذف جميع الديون المسددة");
+      fetchDebts();
+    } catch(error){ console.error(error); }
   };
 
   if (loading) return <p>جاري التحقق من الصلاحية...</p>;
@@ -355,6 +365,7 @@ function Debts() {
             </div>
             <div className={styles.headBtns}>
               <button onClick={exportToExcel}>Excel</button>
+              <button onClick={deletePaidDebts}>حذف المسدد</button>
             </div>
           </div>
           <div className={styles.tableContainer}>
@@ -366,6 +377,7 @@ function Debts() {
                   <th>المبلغ</th>
                   <th>النوع</th>
                   <th>طريقة الدفع</th>
+                  <th>الحالة</th>
                   <th>التاريخ</th>
                   <th>تفاعل</th>
                 </tr>
@@ -378,6 +390,26 @@ function Debts() {
                     <td>{d.amount} ج.م</td>
                     <td>{d.debtType}</td>
                     <td>{d.payMethod==="محفظة" ? `محفظة - ${d.walletPhone||""}` : "نقدي"}</td>
+                   <td
+                      style={{
+                        backgroundColor:
+                          d.status === "تم السداد"
+                            ? "rgba(122, 255, 122, 0.3)" // خلفية أخضر شفاف
+                            : d.status === "لم يتم السداد"
+                            ? "rgba(255, 255, 122, 0.3)" // خلفية أصفر شفاف
+                            : "",
+                        color:
+                          d.status === "تم السداد"
+                            ? "green" // نص أخضر عادي
+                            : d.status === "لم يتم السداد"
+                            ? "goldenrod" // نص أصفر واضح
+                            : "",
+                        fontWeight: "bold", // يخلي الكلمة أوضح
+                        textAlign: "center", // يخلي النص في النص لو حابب
+                      }}
+                    >
+                      {d.status}
+                  </td>
                     <td>{d.date}</td>
                     <td className={styles.actions}>
                       <button onClick={()=>handleEdit(d)}><MdModeEditOutline/></button>
@@ -386,7 +418,7 @@ function Debts() {
                   </tr>
                 ))}
                 {debts.length===0 && (
-                  <tr><td colSpan={6} style={{textAlign:"center"}}>لا يوجد بيانات</td></tr>
+                  <tr><td colSpan={8} style={{textAlign:"center"}}>لا يوجد بيانات</td></tr>
                 )}
               </tbody>
             </table>
