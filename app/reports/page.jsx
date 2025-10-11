@@ -30,7 +30,7 @@ function Reports() {
   const [total, setTotal] = useState(0);
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [cashBalance, setCashBalance] = useState(0); // الرصيد النقدي الحقيقي
+  const [cashBalance, setCashBalance] = useState(0);
 
   useEffect(() => {
     const checkLockAndSetEmail = async () => {
@@ -65,7 +65,6 @@ function Reports() {
     checkLockAndSetEmail();
   }, []);
 
-  // جلب الرصيد النقدي الحقيقي من collection cash
   const fetchCashBalance = async () => {
     const cashSnap = await getDocs(collection(db, "cash"));
     let balance = 0;
@@ -113,7 +112,6 @@ function Reports() {
     });
 
     allReports.sort((a, b) => b.reportDateObj - a.reportDateObj);
-
     setReports(allReports);
   };
 
@@ -167,8 +165,11 @@ function Reports() {
     const sendReports = filteredReports.filter((r) => r.type === "ارسال");
     const receiveReports = filteredReports.filter((r) => r.type === "استلام");
 
-    const sumSend = sendReports.reduce((acc, r) => acc + Number(r.commation || 0), 0);
-    const sumReceive = receiveReports.reduce((acc, r) => acc + Number(r.commation || 0), 0);
+    // ✅ إجمالي المبالغ + إجمالي العمولات
+    const sumSendAmount = sendReports.reduce((acc, r) => acc + Number(r.operationVal || 0), 0);
+    const sumReceiveAmount = receiveReports.reduce((acc, r) => acc + Number(r.operationVal || 0), 0);
+    const sumSendComm = sendReports.reduce((acc, r) => acc + Number(r.commation || 0), 0);
+    const sumReceiveComm = receiveReports.reduce((acc, r) => acc + Number(r.commation || 0), 0);
 
     // المحافظ
     const numbersSnap = await getDocs(query(collection(db, "numbers")));
@@ -180,7 +181,20 @@ function Reports() {
       totalWallets += Number(data.amount || 0);
     });
 
-    // العمليات النقدية فقط للعرض في Excel (نوعها "سحب نقدي" أو "ايداع نقدي")
+    // ✅ الديون
+    const debtsSnap = await getDocs(collection(db, "debts"));
+    let debts = [];
+    debtsSnap.forEach((docSnap) => {
+      const data = docSnap.data();
+      debts.push([
+        data.name || "-",
+        data.phone || "-",
+        Number(data.amount || 0),
+        data.notes || "-",
+        data.date || "-"
+      ]);
+    });
+
     const cashOperations = reports
       .filter((r) => r.type === "سحب نقدي" || r.type === "ايداع نقدي")
       .map((r) => ({
@@ -188,45 +202,51 @@ function Reports() {
         operationDateTime: r.reportDateObj.toLocaleString("ar-EG"),
       }));
 
-    const capital = totalWallets + cashBalance; // رأس المال = المحافظ + الرصيد النقدي الحقيقي
+    const capital = totalWallets + cashBalance;
     const totalProfit = reports.reduce((acc, r) => acc + Number(r.commation || 0), 0);
 
     const sheetData = [];
 
-    // جدول الاستلام
+    // 📋 جدول الاستلام
     sheetData.push(["📌 جدول الاستلام"]);
     sheetData.push(["المستخدم","الرقم", "العملية", "المبلغ", "العمولة", "الملاحظات", "التاريخ والوقت"]);
     receiveReports.forEach((r) => {
       sheetData.push([r.userName || "-" ,r.phone || "-", r.type || "-", r.operationVal || 0, r.commation || 0, r.notes || "-", r.reportDateTime || "-"]);
     });
-    sheetData.push(["الإجمالي", "-", "-", sumReceive, "-", "-"]);
+    sheetData.push(["إجمالي المبلغ", sumReceiveAmount, "إجمالي العمولات", sumReceiveComm]);
     sheetData.push([]);
 
-    // جدول الإرسال
+    // 📋 جدول الإرسال
     sheetData.push(["📌 جدول الإرسال"]);
     sheetData.push(["المستخدم","الرقم", "العملية", "المبلغ", "العمولة", "الملاحظات", "التاريخ والوقت"]);
     sendReports.forEach((r) => {
       sheetData.push([r.userName || "-" ,r.phone || "-", r.type || "-", r.operationVal || 0, r.commation || 0, r.notes || "-", r.reportDateTime || "-"]);
     });
-    sheetData.push(["الإجمالي", "-", "-", sumSend, "-", "-"]);
+    sheetData.push(["إجمالي المبلغ", sumSendAmount, "إجمالي العمولات", sumSendComm]);
     sheetData.push([]);
 
-    // جدول العمليات النقدية (عرض فقط)
+    // 📋 جدول العمليات النقدية
     sheetData.push(["📌 جدول العمليات النقدية"]);
     sheetData.push(["النوع", "المبلغ", "العمولة", "ملاحظات", "التاريخ والوقت"]);
     cashOperations.forEach((op) => {
       sheetData.push([op.type, op.operationVal || 0, op.commation || 0, op.notes || "-", op.operationDateTime]);
     });
-    sheetData.push([]); // صف فاضي
+    sheetData.push([]);
 
-    // تقرير المحافظ
+    // 📋 تقرير المحافظ
     sheetData.push(["📌 تقرير المحافظ"]);
     sheetData.push(["رقم المحفظة", "اسم المحفظة", "الرصيد"]);
     wallets.forEach((w) => sheetData.push(w));
     sheetData.push(["إجمالي المحافظ", "-", totalWallets]);
     sheetData.push([]);
 
-    // الملخص المالي
+    // 📋 جدول الديون
+    sheetData.push(["📌 جدول الديون"]);
+    sheetData.push(["الاسم", "رقم الهاتف", "المبلغ", "ملاحظات", "التاريخ"]);
+    debts.forEach((d) => sheetData.push(d));
+    sheetData.push([]);
+
+    // 📋 الملخص المالي
     sheetData.push(["📌 الملخص المالي"]);
     sheetData.push(["إجمالي رأس المال", capital]);
     sheetData.push(["الرصيد النقدي", cashBalance]);

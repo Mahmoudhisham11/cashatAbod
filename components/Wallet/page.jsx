@@ -68,6 +68,18 @@ function Wallet({ openWallet, setOpenWallet }) {
       return;
     }
 
+    // ✅ التحقق من الليميت الشهري
+    if (Number(operationVal) > Number(withdrawLimit)) {
+      alert("قيمة العملية تتجاوز الحد الشهري المسموح به");
+      return;
+    }
+
+    // ✅ التحقق من الليميت اليومي
+    if (Number(operationVal) > Number(dailyWithdraw)) {
+      alert("قيمة العملية تتجاوز الحد اليومي المسموح به");
+      return;
+    }
+
     // ✅ إضافة العملية
     await addDoc(collection(db, "operations"), {
       commation,
@@ -143,7 +155,7 @@ function Wallet({ openWallet, setOpenWallet }) {
               <input
                 type="text"
                 value={receiver}
-                placeholder="اكتب اسم المرسل إليه"
+                placeholder="اكتب رقم المرسل إليه"
                 onChange={(e) => setReceiver(e.target.value)}
               />
             </div>

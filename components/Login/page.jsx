@@ -3,6 +3,7 @@ import { useState } from "react";
 import styles from "./styles.module.css";
 import { db } from "../../app/firebase";
 import { addDoc, collection, getDocs, query, serverTimestamp, where, updateDoc, doc } from "firebase/firestore";
+import emailjs from "emailjs-com"; // ✅ استيراد مكتبة EmailJS
 
 function Login() {
   const [acitve, setActive] = useState(true);
@@ -54,18 +55,18 @@ function Login() {
       if (userData.password !== password) {
         alert("❌ يوجد مشكلة في كلمة المرور");
       } else {
-          if (typeof window !== "undefined") {
-            localStorage.setItem("email", email);
-            localStorage.setItem("name", userData.name);
-          }
-          if (typeof window !== "undefined") {
-            window.location.reload();
-          }
+        if (typeof window !== "undefined") {
+          localStorage.setItem("email", email);
+          localStorage.setItem("name", userData.name);
+        }
+        if (typeof window !== "undefined") {
+          window.location.reload();
         }
       }
+    }
   };
 
-  // ✅ إرسال OTP
+  // ✅ إرسال OTP عبر Gmail باستخدام EmailJS
   const handleSendOtp = async () => {
     if (!resetEmail) {
       alert("من فضلك ادخل البريد الالكتروني");
@@ -81,12 +82,30 @@ function Login() {
       return;
     }
 
-    // توليد OTP
+    // ✅ توليد OTP
     const randomOtp = Math.floor(100000 + Math.random() * 900000).toString();
     setGeneratedOtp(randomOtp);
 
-    alert("🔑 كود التحقق الخاص بك هو: " + randomOtp);
-    setStep(2); // الانتقال للخطوة التالية
+    // ✅ إعداد بيانات الإرسال إلى EmailJS
+    const templateParams = {
+      to_email: resetEmail,
+      otp_code: randomOtp,
+    };
+
+    try {
+      await emailjs.send(
+        "service_sm8p9w7", // 🔹 استبدل بـ Service ID الخاص بك
+        "template_8vuymg3", // 🔹 استبدل بـ Template ID الخاص بك
+        templateParams,
+        "9bww7-IDQJ9coDcwE" // 🔹 استبدل بالمفتاح العام من حسابك EmailJS
+      );
+
+      alert("✅ تم إرسال كود التحقق إلى بريدك الإلكتروني");
+      setStep(2); // الانتقال للخطوة التالية
+    } catch (error) {
+      console.error("EmailJS Error:", error);
+      alert("❌ حدث خطأ أثناء إرسال الإيميل، حاول مرة أخرى");
+    }
   };
 
   // ✅ التحقق وتحديث الباسورد

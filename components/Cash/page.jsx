@@ -66,8 +66,21 @@ function Cash({ openCash, setOpenCash }) {
       return;
     }
 
+    // ✅ التحقق من الرصيد
     if (Number(operationVal) > Number(amount)) {
       alert("قيمة العملية أكبر من رصيد الخط الحالي");
+      return;
+    }
+
+    // ✅ التحقق من الليميت الشهري
+    if (Number(operationVal) > Number(depositLimit)) {
+      alert("قيمة العملية تتجاوز الحد الشهري المسموح به");
+      return;
+    }
+
+    // ✅ التحقق من الليميت اليومي
+    if (Number(operationVal) > Number(dailyDeposit)) {
+      alert("قيمة العملية تتجاوز الحد اليومي المسموح به");
       return;
     }
 
@@ -144,7 +157,7 @@ function Cash({ openCash, setOpenCash }) {
               <input
                 type="text"
                 value={receiver}
-                placeholder="اكتب اسم المرسل إليه"
+                placeholder="اكتب رقم المرسل إليه"
                 onChange={(e) => setReceiver(e.target.value)}
               />
             </div>
