@@ -63,16 +63,29 @@ function Main() {
       setUserName(storageName);
       setUserEmail(storageEmail);
       // جلب lockMoney و lockDaily من Firestore لكل مستخدم مع live updates
-      const usersQ = query(collection(db, "users"), where("email", "==", storageEmail));
-      const unsubUser = onSnapshot(usersQ, (qs) => {
-        if (!qs.empty) {
-          const userData = qs.docs[0].data();
-          setHideAmounts(userData.lockMoney === true);
-          setLockDaily(userData.lockDaily === true);
-        }
-      }, (err) => {
-        console.error("خطأ في قراءة lockMoney/lockDaily:", err);
-      });
+      // جلب بيانات المستخدم مع live updates + فحص الاشتراك
+const usersQ = query(collection(db, "users"), where("email", "==", storageEmail));
+const unsubUser = onSnapshot(
+  usersQ,
+  (qs) => {
+    if (!qs.empty) {
+      const userData = qs.docs[0].data();
+      setHideAmounts(userData.lockMoney === true);
+      setLockDaily(userData.lockDaily === true);
+
+      // ✅ لو المستخدم غير مشترك يتم مسح كل البيانات من localStorage وعمل reload
+      if (userData.isSubscribe === false) {
+        alert("⚠️ تم إيقاف اشتراكك. سيتم تسجيل الخروج.");
+        localStorage.clear();
+        window.location.reload();
+      }
+    }
+  },
+  (err) => {
+    console.error("خطأ في قراءة بيانات المستخدم:", err);
+  }
+);
+
 
       return () => unsubUser();
     }

@@ -2,7 +2,16 @@
 import { useState } from "react";
 import styles from "./styles.module.css";
 import { db } from "../../app/firebase";
-import { addDoc, collection, getDocs, query, serverTimestamp, where, updateDoc, doc } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  getDocs,
+  query,
+  serverTimestamp,
+  where,
+  updateDoc,
+  doc,
+} from "firebase/firestore";
 import emailjs from "emailjs-com"; // ✅ استيراد مكتبة EmailJS
 
 function Login() {
@@ -30,6 +39,7 @@ function Login() {
           name,
           email,
           password,
+          isSubscribe: false, // ✅ الاشتراك الافتراضي يكون false
           date: serverTimestamp(),
         });
         alert("✅ تم انشاء حساب جديد");
@@ -42,7 +52,7 @@ function Login() {
     }
   };
 
-  // CHECK ACCOUNT AND LOGIN
+  // ✅ CHECK ACCOUNT AND LOGIN
   const handleLogin = async () => {
     const userRef = collection(db, "users");
     const q = query(userRef, where("email", "==", email));
@@ -52,9 +62,15 @@ function Login() {
     } else {
       const userDoc = querySnapshot.docs[0];
       const userData = userDoc.data();
+
       if (userData.password !== password) {
         alert("❌ يوجد مشكلة في كلمة المرور");
-      } else {
+      } 
+      // ✅ تحقق من الاشتراك
+      else if (!userData.isSubscribe) {
+        alert("⚠️ حسابك غير مفعل، برجاء تفعيل الحساب أولاً");
+      } 
+      else {
         if (typeof window !== "undefined") {
           localStorage.setItem("email", email);
           localStorage.setItem("name", userData.name);
@@ -94,10 +110,10 @@ function Login() {
 
     try {
       await emailjs.send(
-        "service_sm8p9w7", // 🔹 استبدل بـ Service ID الخاص بك
-        "template_8vuymg3", // 🔹 استبدل بـ Template ID الخاص بك
+        "service_sm8p9w7", // 🔹 Service ID
+        "template_8vuymg3", // 🔹 Template ID
         templateParams,
-        "9bww7-IDQJ9coDcwE" // 🔹 استبدل بالمفتاح العام من حسابك EmailJS
+        "9bww7-IDQJ9coDcwE" // 🔹 Public Key
       );
 
       alert("✅ تم إرسال كود التحقق إلى بريدك الإلكتروني");
@@ -162,6 +178,7 @@ function Login() {
             </button>
           </div>
         </div>
+
         {acitve ? (
           <div className={styles.form}>
             <div className="inputContainer">
@@ -264,7 +281,9 @@ function Login() {
                   onChange={(e) => setNewPassword(e.target.value)}
                 />
                 <div className={styles.popupButtons}>
-                  <button onClick={handleResetPassword}>تغيير كلمة المرور</button>
+                  <button onClick={handleResetPassword}>
+                    تغيير كلمة المرور
+                  </button>
                 </div>
               </>
             )}
