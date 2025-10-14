@@ -108,11 +108,6 @@ function Sittings() {
     fetchUserData();
   }, [selectedUserId]);
 
-  // 🔹 تسجيل خروج
-  const handleLogout = () => {
-    localStorage.clear();
-    router.push('/');
-  };
 
   // 🔹 تحديث الصلاحيات
   const handleLockUpdate = async () => {
@@ -311,14 +306,6 @@ function Sittings() {
                 <button onClick={() => setOpenDev(true)}>
                   <span><BsPersonVideo2 /></span>
                   <span>تواصل مع المطور</span>
-                </button>
-                <p><MdKeyboardArrowLeft /></p>
-              </div>
-              <hr />
-              <div className={styles.btnContent}>
-                <button onClick={handleLogout}>
-                  <span><RiLogoutCircleLine /></span>
-                  <span>تسجيل الخروج</span>
                 </button>
                 <p><MdKeyboardArrowLeft /></p>
               </div>

@@ -6,6 +6,7 @@ import Image from "next/image";
 import { FaArrowUp, FaArrowDown, FaRegTrashAlt } from "react-icons/fa";
 import { BiMemoryCard } from "react-icons/bi";
 import { FaArchive } from "react-icons/fa";
+import { RiLogoutCircleLine } from "react-icons/ri";
 import Nav from "../Nav/page";
 import Wallet from "../Wallet/page";
 import Cash from "../Cash/page";
@@ -312,6 +313,11 @@ const unsubUser = onSnapshot(
       alert("حدث خطأ أثناء تقفيل اليوم ❌");
     }
   };
+    // 🔹 تسجيل خروج
+  const handleLogout = () => {
+    localStorage.clear();
+    window.location.reload()
+  };
 
   return (
     <div className={styles.main}>
@@ -338,6 +344,7 @@ const unsubUser = onSnapshot(
             />
             <span className="slider"></span>
           </label>
+          <button onClick={handleLogout}><RiLogoutCircleLine/></button>
         </div>
       </div>
 
