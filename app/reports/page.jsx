@@ -187,8 +187,8 @@ function Reports() {
     debtsSnap.forEach((docSnap) => {
       const data = docSnap.data();
       debts.push([
-        data.name || "-",
-        data.phone || "-",
+        data.clientName || "-",
+        data.walletPhone || "-",
         Number(data.amount || 0),
         data.notes || "-",
         data.date || "-"
