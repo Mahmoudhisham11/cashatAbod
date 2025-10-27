@@ -110,7 +110,7 @@ function Login() {
 
     try {
       await emailjs.send(
-        "service_sm8p9w7", // 🔹 Service ID
+        "service_e96lr6s", // 🔹 Service ID
         "template_8vuymg3", // 🔹 Template ID
         templateParams,
         "9bww7-IDQJ9coDcwE" // 🔹 Public Key
