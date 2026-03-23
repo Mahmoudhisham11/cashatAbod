@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import CashPop from "../../components/CashPop/page";
 import Developer from "../../components/Developer/page";
 import { db } from "../../app/firebase";
-import { collection, doc, getDoc, getDocs, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, updateDoc, deleteDoc, addDoc, Timestamp } from "firebase/firestore";
 
 function Sittings() {
   const router = useRouter();
@@ -20,6 +20,7 @@ function Sittings() {
   const [openDev, setOpenDev] = useState(false);
   const [openPermissions, setOpenPermissions] = useState(false);
   const [openActivations, setOpenActivations] = useState(false);
+  const [openProfitPopup, setOpenProfitPopup] = useState(false);
   const [userName, setUserName] = useState('');
   const [users, setUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -35,6 +36,8 @@ function Sittings() {
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSubscribe, setIsSubscribe] = useState(true);
+  const [profitValue, setProfitValue] = useState("");
+  const [profitDate, setProfitDate] = useState("");
 
   // 🔹 التحقق من صلاحية الدخول
   useEffect(() => {
@@ -162,6 +165,41 @@ function Sittings() {
     setOpenActivations(false);
   };
 
+  const handleAddProfit = async () => {
+    const parsedProfit = Number(profitValue);
+    if (!profitDate) {
+      alert("⚠️ اختر تاريخ الأرباح");
+      return;
+    }
+    if (!parsedProfit || parsedProfit <= 0) {
+      alert("⚠️ أدخل قيمة أرباح صحيحة");
+      return;
+    }
+
+    try {
+      const selectedDate = new Date(`${profitDate}T12:00:00`);
+      await addDoc(collection(db, "reports"), {
+        type: "أرباح يدوية",
+        phone: "-",
+        operationVal: 0,
+        commation: parsedProfit,
+        notes: "إضافة أرباح من الإعدادات",
+        userName: userName || "admin",
+        date: selectedDate.toISOString(),
+        createdAt: Timestamp.fromDate(selectedDate),
+        isManualProfit: true
+      });
+
+      alert("✅ تم إضافة الأرباح بنجاح");
+      setProfitValue("");
+      setProfitDate("");
+      setOpenProfitPopup(false);
+    } catch (error) {
+      console.error("Error adding manual profit:", error);
+      alert("❌ حدث خطأ أثناء إضافة الأرباح");
+    }
+  };
+
   if (loading) return <p>جاري التحقق...</p>;
   if (!authorized) return null;
 
@@ -263,6 +301,42 @@ function Sittings() {
         </div>
       )}
 
+      {/* 🔹 Popup إضافة أرباح */}
+      {openProfitPopup && (
+        <div className={styles.popupOverlay} onClick={() => setOpenProfitPopup(false)}>
+          <div className={styles.popupContent} onClick={(e) => e.stopPropagation()}>
+            <h3>إضافة أرباح</h3>
+
+            <div className={styles.passwordInput}>
+              <label>قيمة الأرباح</label>
+              <input
+                type="number"
+                min="0"
+                value={profitValue}
+                onChange={(e) => setProfitValue(e.target.value)}
+                placeholder="اكتب قيمة الأرباح"
+              />
+            </div>
+
+            <div className={styles.passwordInput}>
+              <label>تاريخ الأرباح</label>
+              <input
+                type="date"
+                value={profitDate}
+                onChange={(e) => setProfitDate(e.target.value)}
+              />
+            </div>
+
+            <button className={styles.saveBtn} onClick={handleAddProfit}>
+              حفظ الأرباح
+            </button>
+            <button className={styles.closeBtn} onClick={() => setOpenProfitPopup(false)}>
+              إغلاق
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className={styles.sittingsContainer}>
         <div className="header">
           <h2>الاعدادات</h2>
@@ -293,6 +367,14 @@ function Sittings() {
                 <button onClick={() => setOpenActivations(true)}>
                   <span><CiLock /></span>
                   <span>تفعيلات المستخدمين</span>
+                </button>
+                <p><MdKeyboardArrowLeft /></p>
+              </div>
+              <hr />
+              <div className={styles.btnContent}>
+                <button onClick={() => setOpenProfitPopup(true)}>
+                  <span><GiMoneyStack /></span>
+                  <span>الأرباح</span>
                 </button>
                 <p><MdKeyboardArrowLeft /></p>
               </div>
