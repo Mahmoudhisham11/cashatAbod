@@ -152,6 +152,20 @@ function Reports() {
     }
   };
 
+  const handleDeleteReport = async (reportId) => {
+    const confirmDelete = window.confirm("هل أنت متأكد أنك تريد حذف هذا التقرير؟");
+    if (!confirmDelete) return;
+
+    try {
+      await deleteDoc(doc(db, "reports", reportId));
+      alert("✅ تم حذف التقرير");
+      fetchReports();
+    } catch (error) {
+      console.error("❌ خطأ أثناء حذف التقرير:", error);
+      alert("❌ حدث خطأ أثناء حذف التقرير");
+    }
+  };
+
   const handleExportExcel = async () => {
     if (reports.length === 0) {
       alert("⚠️ لا يوجد بيانات للتصدير");
@@ -310,6 +324,7 @@ function Reports() {
                   <th>العمولة</th>
                   <th>ملاحظات</th>
                   <th>التاريخ والوقت</th>
+                  <th>حذف</th>
                 </tr>
               </thead>
               <tbody>
@@ -319,11 +334,34 @@ function Reports() {
                     <tr key={report.id}>
                       <td>{report.userName || "-"}</td>
                       <td>{report.phone || "-"}</td>
-                      <td>{report.type || "-"}</td>
+                      <td>
+                        {report.type || "-"}
+                        {report.isManualProfit ? " (يدوي)" : ""}
+                      </td>
                       <td>{report.operationVal || 0} جنية</td>
                       <td>{report.commation || 0} جنية</td>
                       <td>{report.notes || "-"}</td>
                       <td>{report.reportDateTime}</td>
+                      <td>
+                        <button
+                          onClick={() => handleDeleteReport(report.id)}
+                          title="حذف التقرير"
+                          style={{
+                            background: "rgba(253, 100, 100, 0.20)",
+                            color: "red",
+                            border: "none",
+                            borderRadius: "8px",
+                            width: "44px",
+                            height: "34px",
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <FaTrashAlt />
+                        </button>
+                      </td>
                     </tr>
                   ))}
               </tbody>
