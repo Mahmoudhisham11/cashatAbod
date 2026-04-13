@@ -1,5 +1,6 @@
 'use client';
 import styles from "./styles.module.css";
+import mainListStyles from "../../components/Main/styles.module.css";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { MdOutlineKeyboardArrowLeft } from "react-icons/md";
@@ -18,6 +19,9 @@ import { useRouter } from "next/navigation";
 // مكتبة Excel
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import EmptyState from "../../components/ui/EmptyState";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
+import { useToast } from "../../components/ui/ToastProvider";
 
 function Reports() {
   const router = useRouter();
@@ -31,6 +35,10 @@ function Reports() {
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
   const [cashBalance, setCashBalance] = useState(0);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [confirmDeleteReportId, setConfirmDeleteReportId] = useState(null);
+  const [infoDialog, setInfoDialog] = useState({ open: false, title: "", description: "" });
+  const { toast } = useToast();
 
   useEffect(() => {
     const checkLockAndSetEmail = async () => {
@@ -48,7 +56,11 @@ function Reports() {
       if (!snapshot.empty) {
         const user = snapshot.docs[0].data();
         if (user.lockReports) {
-          alert("❌ مالكش صلاحية الدخول للصفحة");
+          setInfoDialog({
+            open: true,
+            title: "لا توجد صلاحية",
+            description: "لا تملك صلاحية الدخول إلى صفحة التقارير.",
+          });
           router.push('/');
           return;
         } else {
@@ -78,7 +90,7 @@ function Reports() {
   const fetchReports = async () => {
     if (!authorized || !email) return;
 
-    const q = query(collection(db, 'reports'));
+    const q = query(collection(db, "reports"));
     const querySnapshot = await getDocs(q);
 
     const allReports = [];
@@ -133,9 +145,11 @@ function Reports() {
   }, [reports, operationFilter]);
 
   const handleDeleteAllReports = async () => {
-    const confirmDelete = confirm("هل أنت متأكد أنك تريد حذف جميع التقارير؟ لا يمكن التراجع.");
-    if (!confirmDelete) return;
+    setConfirmDeleteAll(true);
+  };
 
+  const confirmDeleteAllAction = async () => {
+    setConfirmDeleteAll(false);
     try {
       const q = query(collection(db, "reports"));
       const querySnapshot = await getDocs(q);
@@ -144,31 +158,39 @@ function Reports() {
       );
 
       await Promise.all(deletePromises);
-      alert("✅ تم حذف جميع التقارير بنجاح");
+      toast("تم حذف جميع التقارير", "success");
       fetchReports();
     } catch (error) {
       console.error("❌ حدث خطأ أثناء الحذف:", error);
-      alert("حدث خطأ أثناء حذف التقارير");
+      toast("حدث خطأ أثناء حذف التقارير", "error");
     }
   };
 
   const handleDeleteReport = async (reportId) => {
-    const confirmDelete = window.confirm("هل أنت متأكد أنك تريد حذف هذا التقرير؟");
-    if (!confirmDelete) return;
+    setConfirmDeleteReportId(reportId);
+  };
 
+  const confirmDeleteSingleAction = async () => {
+    if (!confirmDeleteReportId) return;
     try {
-      await deleteDoc(doc(db, "reports", reportId));
-      alert("✅ تم حذف التقرير");
+      await deleteDoc(doc(db, "reports", confirmDeleteReportId));
+      toast("تم حذف التقرير", "success");
       fetchReports();
     } catch (error) {
       console.error("❌ خطأ أثناء حذف التقرير:", error);
-      alert("❌ حدث خطأ أثناء حذف التقرير");
+      toast("حدث خطأ أثناء حذف التقرير", "error");
+    } finally {
+      setConfirmDeleteReportId(null);
     }
   };
 
   const handleExportExcel = async () => {
     if (reports.length === 0) {
-      alert("⚠️ لا يوجد بيانات للتصدير");
+      setInfoDialog({
+        open: true,
+        title: "لا يوجد بيانات",
+        description: "لا توجد تقارير متاحة للتصدير الآن.",
+      });
       return;
     }
 
@@ -278,8 +300,44 @@ function Reports() {
   if (loading) return <p>🔄 جاري التحقق...</p>;
   if (!authorized) return null;
 
+  const filteredReports = reports.filter((r) => !operationFilter || r.type === operationFilter);
+
+  const reportTypeBadgeClass = (type) => {
+    const t = (type || "").toString().toLowerCase();
+    if (t.includes("ارسال") || t.includes("send")) return mainListStyles.typeBadgeSend;
+    if (t.includes("استلام") || t.includes("receive")) return mainListStyles.typeBadgeReceive;
+    return mainListStyles.typeBadgeNeutral;
+  };
+
   return (
     <div className="main">
+      <ConfirmDialog
+        open={confirmDeleteAll}
+        title="حذف جميع التقارير"
+        description="لا يمكن التراجع بعد حذف التقارير. هل تريد المتابعة؟"
+        danger
+        confirmText="حذف الكل"
+        onClose={() => setConfirmDeleteAll(false)}
+        onConfirm={confirmDeleteAllAction}
+      />
+      <ConfirmDialog
+        open={!!confirmDeleteReportId}
+        title="حذف التقرير"
+        description="هل أنت متأكد من حذف هذا التقرير؟"
+        danger
+        confirmText="حذف"
+        onClose={() => setConfirmDeleteReportId(null)}
+        onConfirm={confirmDeleteSingleAction}
+      />
+      <ConfirmDialog
+        open={infoDialog.open}
+        title={infoDialog.title}
+        description={infoDialog.description}
+        confirmText="حسنًا"
+        cancelText="إغلاق"
+        onClose={() => setInfoDialog({ open: false, title: "", description: "" })}
+        onConfirm={() => setInfoDialog({ open: false, title: "", description: "" })}
+      />
       <div className={styles.reportsContainer}>
         <div className="header">
           <h2>التقارير</h2>
@@ -304,33 +362,41 @@ function Reports() {
         </div>
 
         <div className={styles.content}>
-          <div className={styles.contentTitle}>
-            <h2>اجمالي الارباح : {total} جنية</h2>
-            <h2>الرصيد النقدي : {cashBalance} جنية</h2>
-            <div className={styles.btnsContainer}>
-              <button onClick={() => window.print()}>PDF</button>
-              <button onClick={handleExportExcel}>Excel</button>
-              <button onClick={handleDeleteAllReports}><FaTrashAlt/></button>
+          <div className={styles.statsGrid}>
+            <div className={styles.statCard}>
+              <p>إجمالي الأرباح</p>
+              <h3>{total} جنيه</h3>
+            </div>
+            <div className={styles.statCard}>
+              <p>الرصيد النقدي</p>
+              <h3>{cashBalance} جنيه</h3>
             </div>
           </div>
           <div className={styles.tableContainer}>
-            <table>
-              <thead>
-                <tr>
-                  <th>المستخدم</th>
-                  <th>الرقم</th>
-                  <th>العملية</th>
-                  <th>المبلغ</th>
-                  <th>العمولة</th>
-                  <th>ملاحظات</th>
-                  <th>التاريخ والوقت</th>
-                  <th>حذف</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reports
-                  .filter((report) => !operationFilter || report.type === operationFilter)
-                  .map((report) => (
+            <div className={styles.tableToolbar}>
+              <h2>سجل التقارير</h2>
+              <div className={styles.btnsContainer}>
+                <button onClick={() => window.print()}>PDF</button>
+                <button onClick={handleExportExcel}>Excel</button>
+                <button className={styles.dangerAction} onClick={handleDeleteAllReports}><FaTrashAlt/></button>
+              </div>
+            </div>
+            <div className={mainListStyles.operationsTable}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>المستخدم</th>
+                    <th>الرقم</th>
+                    <th>العملية</th>
+                    <th>المبلغ</th>
+                    <th>العمولة</th>
+                    <th>ملاحظات</th>
+                    <th>التاريخ والوقت</th>
+                    <th>حذف</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredReports.map((report) => (
                     <tr key={report.id}>
                       <td>{report.userName || "-"}</td>
                       <td>{report.phone || "-"}</td>
@@ -344,6 +410,7 @@ function Reports() {
                       <td>{report.reportDateTime}</td>
                       <td>
                         <button
+                          type="button"
                           onClick={() => handleDeleteReport(report.id)}
                           title="حذف التقرير"
                           style={{
@@ -364,8 +431,55 @@ function Reports() {
                       </td>
                     </tr>
                   ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
+            <div className={`${mainListStyles.operationsCards} ${styles.reportCardsList}`}>
+              {filteredReports.map((report) => (
+                <article key={report.id} className={mainListStyles.opCard}>
+                  <div className={mainListStyles.opCardHeader}>
+                    <span className={reportTypeBadgeClass(report.type)}>
+                      {report.type || "-"}
+                      {report.isManualProfit ? " (يدوي)" : ""}
+                    </span>
+                    <button
+                      type="button"
+                      className={mainListStyles.action}
+                      onClick={() => handleDeleteReport(report.id)}
+                      title="حذف التقرير"
+                    >
+                      <FaTrashAlt />
+                    </button>
+                  </div>
+                  <div className={mainListStyles.opCardAmounts}>
+                    <div className={mainListStyles.opCardAmountBlock}>
+                      <span>المبلغ</span>
+                      <strong>{report.operationVal || 0} جنية</strong>
+                    </div>
+                    <div className={mainListStyles.opCardAmountBlock}>
+                      <span>العمولة</span>
+                      <strong>{report.commation || 0} جنية</strong>
+                    </div>
+                  </div>
+                  <dl className={mainListStyles.opCardMeta}>
+                    <div className={mainListStyles.opCardRow}>
+                      <dt>المستخدم</dt>
+                      <dd>{report.userName || "-"}</dd>
+                    </div>
+                    <div className={mainListStyles.opCardRow}>
+                      <dt>الرقم</dt>
+                      <dd>{report.phone || "-"}</dd>
+                    </div>
+                    <div className={mainListStyles.opCardRow}>
+                      <dt>ملاحظات</dt>
+                      <dd>{report.notes || "-"}</dd>
+                    </div>
+                  </dl>
+                  <p className={mainListStyles.opCardDate}>{report.reportDateTime}</p>
+                </article>
+              ))}
+            </div>
+            {reports.length === 0 && <EmptyState title="لا توجد تقارير" description="نفّذ عمليات يومية ثم قم بتقفيل اليوم لظهور التقارير." />}
           </div>
         </div>
       </div>

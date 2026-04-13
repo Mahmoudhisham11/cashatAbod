@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-page-custom-font */
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "../components/ui/ToastProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,7 +24,9 @@ export default function RootLayout({ children }) {
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/manifest.json" />
       </head>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }

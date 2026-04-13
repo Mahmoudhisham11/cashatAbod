@@ -1,16 +1,20 @@
 'use client';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import styles from "./styles.module.css";
 import avatar from "../../public/image/Avatar-Profile-Vector-removebg-preview.png";
 import Image from "next/image";
 import { FaArrowUp, FaArrowDown, FaRegTrashAlt } from "react-icons/fa";
 import { BiMemoryCard } from "react-icons/bi";
-import { FaArchive } from "react-icons/fa";
 import { RiLogoutCircleLine } from "react-icons/ri";
+import { MdDarkMode, MdLightMode } from "react-icons/md";
 import Nav from "../Nav/page";
 import Wallet from "../Wallet/page";
 import Cash from "../Cash/page";
 import abod from "../../public/image/TXSC8094.JPG"
+import EmptyState from "../ui/EmptyState";
+import SkeletonRows from "../ui/SkeletonRows";
+import ConfirmDialog from "../ui/ConfirmDialog";
+import { useToast } from "../ui/ToastProvider";
 import { db } from "../../app/firebase";
 import {
   collection,
@@ -42,6 +46,10 @@ function Main() {
   const [theme, setTheme] = useState('light');
   const [hideAmounts, setHideAmounts] = useState(false);
   const [lockDaily, setLockDaily] = useState(false); // لتفعيل قفل حذف اليوم
+  const [confirmDayClose, setConfirmDayClose] = useState(false);
+  const [openProfileMenu, setOpenProfileMenu] = useState(false);
+  const menuRef = useRef(null);
+  const { toast } = useToast();
 
   // THEME CONTROL
   useEffect(() => {
@@ -55,6 +63,16 @@ function Main() {
     localStorage.setItem("theme", newTheme);
     document.body.className = newTheme;
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpenProfileMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // GET LOCALSTORAGE DATA + FETCH lockMoney & lockDaily
   useEffect(() => {
@@ -94,14 +112,14 @@ const unsubUser = onSnapshot(
 
   // SUBSCRIBE TO NUMBERS / OPERATIONS / CASH (live)
   useEffect(() => {
-    const numQ = query(collection(db, 'numbers'));
+    const numQ = query(collection(db, "numbers"));
     const unsubNum = onSnapshot(numQ, (qs) => {
       const arr = [];
       qs.forEach(d => arr.push({ ...d.data(), id: d.id }));
       setNums(arr);
     });
 
-    const opQ = query(collection(db, 'operations'));
+    const opQ = query(collection(db, "operations"));
     const unsubOp = onSnapshot(opQ, (qs) => {
       const arr = qs.docs.map((d) => ({ ...d.data(), id: d.id }));
       arr.sort((a, b) => {
@@ -121,7 +139,7 @@ const unsubUser = onSnapshot(
       setOperations(arr);
     });
 
-    const cashQ = query(collection(db, 'cash'));
+    const cashQ = query(collection(db, "cash"));
     const unsubCash = onSnapshot(cashQ, (qs) => {
       let totalCash = 0;
       qs.forEach((doc) => {
@@ -163,10 +181,25 @@ const unsubUser = onSnapshot(
     }
   };
 
+  const operationTypeBadgeClass = (type) => {
+    const t = (type || "").toString().toLowerCase();
+    if (t.includes("ارسال") || t.includes("send")) return styles.typeBadgeSend;
+    if (t.includes("استلام") || t.includes("receive")) return styles.typeBadgeReceive;
+    return styles.typeBadgeNeutral;
+  };
+
+  const opPhoneOrMachine = (operation) => {
+    if (operation.sourceType === "machine" && operation.machineName) {
+      return operation.machineName;
+    }
+    return operation.phone || "-";
+  };
+
   // handle delete
   const handelDelete = async (id) => {
     if (lockDaily) {
       alert("⚠️ لا يمكنك حذف العمليات اليومية، الصلاحية مقفولة.");
+      toast("صلاحية الحذف اليومي غير متاحة", "warning");
       return;
     }
     try {
@@ -185,18 +218,84 @@ const unsubUser = onSnapshot(
       const phone = op.phone ?? op.number ?? op.phoneNumber ?? null;
       const value = Number(op.operationVal ?? op.operationValue ?? op.amount ?? op.value ?? 0);
 
+      if (!value || isNaN(value)) {
+        toast("قيمة العملية غير صالحة", "error");
+        return;
+      }
+
+      if (op.sourceType === "machine" && op.machineId) {
+        const machineRef = doc(db, "machines", op.machineId);
+        const machineSnap = await getDoc(machineRef);
+        if (!machineSnap.exists()) {
+          const proceed = window.confirm(
+            "لم يُعثر على الماكينة. حذف السجل فقط بدون تعديل الأرصدة؟"
+          );
+          if (!proceed) return;
+          await deleteDoc(opRef);
+          toast("تم حذف العملية", "success");
+          return;
+        }
+
+        const machineData = machineSnap.data();
+        const machineBalance = Number(machineData.balance ?? 0);
+        const t = type.toLowerCase();
+
+        const cashSnap = await getDocs(collection(db, "cash"));
+        const cashDocSnap = cashSnap.docs[0] ?? null;
+        let cashRef = cashDocSnap ? doc(db, "cash", cashDocSnap.id) : null;
+        let cashVal = cashDocSnap ? Number(cashDocSnap.data().cashVal ?? cashDocSnap.data().cash ?? 0) : 0;
+
+        let newMachineBalance = machineBalance;
+        let newCashVal = cashVal;
+
+        if (t.includes("استلام") || t.includes("receive")) {
+          newMachineBalance = machineBalance - value;
+          newCashVal = cashVal + value;
+        } else if (t.includes("ارسال") || t.includes("send")) {
+          newMachineBalance = machineBalance + value;
+          newCashVal = cashVal - value;
+        } else {
+          const proceed = window.confirm(
+            "نوع العملية غير معروف. حذفها سيجري بدون تعديل الأرصدة. تابع؟"
+          );
+          if (!proceed) return;
+          await deleteDoc(opRef);
+          toast("تم حذف العملية", "warning");
+          return;
+        }
+
+        if (newMachineBalance < 0) {
+          toast("لا يمكن الحذف لأن رصيد الماكينة سيصبح بالسالب", "error");
+          return;
+        }
+        if (newCashVal < 0) {
+          toast("لا يمكن الحذف لأن رصيد الكاش سيصبح بالسالب", "error");
+          return;
+        }
+
+        await updateDoc(machineRef, { balance: newMachineBalance });
+
+        if (cashRef) {
+          await updateDoc(cashRef, { cashVal: newCashVal });
+        } else {
+          await addDoc(collection(db, "cash"), {
+            cashVal: newCashVal,
+            createdAt: serverTimestamp(),
+          });
+        }
+
+        await deleteDoc(opRef);
+        toast("تم حذف العملية واسترجاع القيم بنجاح", "success");
+        return;
+      }
+
       if (!phone) {
         const proceed = window.confirm(
           "العملية غير مرتبطة برقم واضح. حذفها سيؤدي فقط إلى إزالة السجل بدون تعديل الأرصدة. تابع؟"
         );
         if (!proceed) return;
         await deleteDoc(opRef);
-        alert("✅ تم حذف العملية.");
-        return;
-      }
-
-      if (!value || isNaN(value)) {
-        alert("⚠️ قيمة العملية غير صالحة، لا يمكن الاستمرار.");
+        toast("تم حذف العملية", "success");
         return;
       }
 
@@ -212,7 +311,7 @@ const unsubUser = onSnapshot(
         );
         if (!proceed) return;
         await deleteDoc(opRef);
-        alert("✅ تم حذف العملية (بدون تعديل الأرصدة لأن الخط غير موجود).");
+        toast("تم حذف العملية بدون تعديل الأرصدة", "warning");
         return;
       }
 
@@ -255,11 +354,11 @@ const unsubUser = onSnapshot(
       }
 
       if (newNumberAmount < 0) {
-        alert("⚠️ لا يمكن حذف العملية لأن ذلك سيجعل رصيد الخط بالسالب. عدّل الرصيد أو راجع العملية أولاً.");
+        toast("لا يمكن الحذف لأن رصيد الخط سيصبح بالسالب", "error");
         return;
       }
       if (newCashVal < 0) {
-        alert("⚠️ لا يمكن حذف العملية لأن ذلك سيجعل رصيد الكاش بالسالب. عدّل الكاش أو راجع العملية أولاً.");
+        toast("لا يمكن الحذف لأن رصيد الكاش سيصبح بالسالب", "error");
         return;
       }
 
@@ -280,10 +379,10 @@ const unsubUser = onSnapshot(
 
       await deleteDoc(opRef);
 
-      alert("✅ تم حذف العملية واسترجاع القيم بنجاح.");
+      toast("تم حذف العملية واسترجاع القيم بنجاح", "success");
     } catch (err) {
       console.error("❌ خطأ أثناء حذف العملية:", err);
-      alert("❌ حدث خطأ أثناء حذف العملية. راجع الكونسول للمزيد من التفاصيل.");
+      toast("حدث خطأ أثناء حذف العملية", "error");
     }
   };
 
@@ -293,24 +392,30 @@ const unsubUser = onSnapshot(
       alert("⚠️ لا يمكنك تقفيل اليوم، صلاحية الحذف مقفولة.");
       return;
     }
-    const confirmDelete = window.confirm("هل أنت متأكد من تقفيل اليوم؟ سيتم نقل العمليات إلى الأرشيف ومسحها من القائمة.");
-    if (!confirmDelete) return;
+    setConfirmDayClose(true);
+  };
+
+  const confirmCloseDayAction = async () => {
+    setConfirmDayClose(false);
     try {
-      const opQ = query(collection(db, 'operations'));
+      const opQ = query(collection(db, "operations"));
       const querySnapshot = await getDocs(opQ);
       if (querySnapshot.empty) {
-        alert("لا توجد عمليات اليوم.");
+        toast("لا توجد عمليات اليوم", "warning");
         return;
       }
       for (const docSnap of querySnapshot.docs) {
         const data = docSnap.data();
-        await addDoc(collection(db, 'reports'), { ...data, archivedAt: new Date().toISOString() });
-        await deleteDoc(doc(db, 'operations', docSnap.id));
+        await addDoc(collection(db, "reports"), {
+          ...data,
+          archivedAt: new Date().toISOString(),
+        });
+        await deleteDoc(doc(db, "operations", docSnap.id));
       }
-      alert("تم تقفيل اليوم بنجاح ✅");
+      toast("تم تقفيل اليوم بنجاح", "success");
     } catch (error) {
       console.error("Error during end of day operations:", error);
-      alert("حدث خطأ أثناء تقفيل اليوم ❌");
+      toast("حدث خطأ أثناء تقفيل اليوم", "error");
     }
   };
     // 🔹 تسجيل خروج
@@ -321,30 +426,54 @@ const unsubUser = onSnapshot(
 
   return (
     <div className={styles.main}>
+      <ConfirmDialog
+        open={confirmDayClose}
+        title="تقفيل اليوم"
+        description="سيتم نقل العمليات الحالية إلى التقارير وحذفها من اليومية. هل تريد المتابعة؟"
+        confirmText="تقفيل اليوم"
+        danger
+        onClose={() => setConfirmDayClose(false)}
+        onConfirm={confirmCloseDayAction}
+      />
       <Wallet openWallet={openWallet} setOpenWallet={setOpenWallet} />
       <Cash openCash={openCash} setOpenCash={setOpenCash} />
       <Nav />
       <div className={styles.title}>
         <div className={styles.text}>
-          {userEmail === "gamalaaaa999@gmail.com" ? 
-           <Image src={abod} className={styles.avatar} alt="avatar" /> :
-           <Image src={avatar} className={styles.avatar} alt="avatar" />
-           }
+          <div className={styles.profileMenuWrap} ref={menuRef}>
+            <button
+              className={styles.avatarBtn}
+              onClick={() => setOpenProfileMenu((prev) => !prev)}
+              aria-expanded={openProfileMenu}
+              aria-haspopup="menu"
+            >
+              {userEmail === "gamalaaaa999@gmail.com" ? 
+                <Image src={abod} className={styles.avatar} alt="avatar" /> :
+                <Image src={avatar} className={styles.avatar} alt="avatar" />
+              }
+            </button>
+            <div className={`${styles.profileDropdown} ${openProfileMenu ? styles.open : ""}`}>
+              <button onClick={toggleTheme}>
+                <span>{theme === "dark" ? <MdLightMode /> : <MdDarkMode />}</span>
+                <span>{theme === "dark" ? "الوضع الفاتح" : "الوضع الداكن"}</span>
+              </button>
+              <button onClick={handleLogout}>
+                <span><RiLogoutCircleLine /></span>
+                <span>تسجيل الخروج</span>
+              </button>
+            </div>
+          </div>
           <h2>مرحبا, <br /> {userName} 👋</h2>
         </div>
-        <div className={styles.leftActions}>
-          <label className="switch">
-            <span className="sun">🌞</span>
-            <span className="moon">🌙</span>
-            <input
-              type="checkbox"
-              className="input"
-              onChange={toggleTheme}
-              checked={theme === 'dark'}
-            />
-            <span className="slider"></span>
-          </label>
-          <button onClick={handleLogout}><RiLogoutCircleLine/></button>
+        <div className={styles.headerActions}>
+          <button
+            className={styles.dayCloseBtn}
+            onClick={handelDeleteDay}
+            title={lockDaily ? "لا يمكن حذف اليوم" : "تقفيل اليوم"}
+            disabled={lockDaily}
+          >
+            تقفيل اليوم
+          </button>
         </div>
       </div>
 
@@ -355,6 +484,10 @@ const unsubUser = onSnapshot(
             <p>{hideAmounts ? "***" : `${capital}.00 جنية`}</p>
           </div>
           <div className={styles.balanceContent}>
+            <div className={styles.balanceHead}>
+              <p>عمليات اليوم</p>
+              <p>{operations.length}</p>
+            </div>
             <div className={styles.balanceHead}>
               <p>المتاح بالمحافظ</p>
               <p>{hideAmounts ? "***" : `${wallet}.00 جنية`}</p>
@@ -379,62 +512,107 @@ const unsubUser = onSnapshot(
       <div className={styles.content}>
         <div className={styles.contentTitle}>
           <h2>العمليات اليومية</h2>
-          <button
-            onClick={handelDeleteDay}
-            title={lockDaily ? "لا يمكن حذف اليوم" : "تقفيل اليوم"}
-            disabled={lockDaily}
-            style={{ cursor: lockDaily ? "not-allowed" : "pointer", opacity: lockDaily ? 0.5 : 1 }}
-          >
-            <FaArchive />
-          </button>
         </div>
         <div className={styles.operations}>
-          <table>
-            <thead>
-              <tr>
-                <th>المستخدم</th>
-                <th>الرقم</th>
-                <th>العملية</th>
-                <th>المبلغ</th>
-                <th>العمولة</th>
-                <th>المرسل اليه</th>
-                <th>ملاحظات</th>
-                <th>التاريخ</th>
-                <th>حذف</th>
-              </tr>
-            </thead>
-            <tbody>
-              {operations.length > 0 ? (
-                operations.map((operation) => (
-                  <tr key={operation.id}>
-                    <td>{operation.userName || "-"}</td>
-                    <td>{operation.phone || "-"}</td>
-                    <td>{operation.type || "-"}</td>
-                    <td>{hideAmounts ? "***" : operation.operationVal ? `${operation.operationVal} جنية` : "-"}</td>
-                    <td>{hideAmounts ? "***" : operation.commation ? `${operation.commation} جنية` : "-"}</td>
-                    <td>{operation.receiver || "-"}</td>
-                    <td>{operation.notes || "-"}</td>
-                    <td>{formatDate(operation.createdAt)}</td>
-                    <td>
-                      <button
-                        className={styles.action}
-                        onClick={() => handelDelete(operation.id)}
-                        title={lockDaily ? "محظور: القفل اليومي مفعل" : "حذف العملية"}
-                        disabled={lockDaily}
-                        style={{ cursor: lockDaily ? "not-allowed" : "pointer", opacity: lockDaily ? 0.5 : 1 }}
-                      >
-                        <FaRegTrashAlt />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
+          {!operations.length && <EmptyState title="لا توجد عمليات يومية" description="ابدأ بعملية ارسال أو استلام من الأزرار السريعة." />}
+          {!userName && <SkeletonRows rows={3} />}
+          <div className={styles.operationsTable}>
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan="9" style={{ textAlign: "center" }}>لا توجد عمليات اليوم</td>
+                  <th>المستخدم</th>
+                  <th>الرقم</th>
+                  <th>العملية</th>
+                  <th>المبلغ</th>
+                  <th>العمولة</th>
+                  <th>المرسل اليه</th>
+                  <th>ملاحظات</th>
+                  <th>التاريخ</th>
+                  <th>حذف</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {operations.length > 0 ? (
+                  operations.map((operation) => (
+                    <tr key={operation.id}>
+                      <td>{operation.userName || "-"}</td>
+                      <td>{opPhoneOrMachine(operation)}</td>
+                      <td>{operation.type || "-"}</td>
+                      <td>{hideAmounts ? "***" : operation.operationVal ? `${operation.operationVal} جنية` : "-"}</td>
+                      <td>{hideAmounts ? "***" : operation.commation ? `${operation.commation} جنية` : "-"}</td>
+                      <td>{operation.receiver || "-"}</td>
+                      <td>{operation.notes || "-"}</td>
+                      <td>{formatDate(operation.createdAt)}</td>
+                      <td>
+                        <button
+                          className={styles.action}
+                          onClick={() => handelDelete(operation.id)}
+                          title={lockDaily ? "محظور: القفل اليومي مفعل" : "حذف العملية"}
+                          disabled={lockDaily}
+                          style={{ cursor: lockDaily ? "not-allowed" : "pointer", opacity: lockDaily ? 0.5 : 1 }}
+                        >
+                          <FaRegTrashAlt />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  null
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className={styles.operationsCards}>
+            {operations.length > 0 &&
+              operations.map((operation) => (
+                <article key={operation.id} className={styles.opCard}>
+                  <div className={styles.opCardHeader}>
+                    <span className={operationTypeBadgeClass(operation.type)}>
+                      {operation.type || "-"}
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.action}
+                      onClick={() => handelDelete(operation.id)}
+                      title={lockDaily ? "محظور: القفل اليومي مفعل" : "حذف العملية"}
+                      disabled={lockDaily}
+                      style={{ cursor: lockDaily ? "not-allowed" : "pointer", opacity: lockDaily ? 0.5 : 1 }}
+                    >
+                      <FaRegTrashAlt />
+                    </button>
+                  </div>
+                  <div className={styles.opCardAmounts}>
+                    <div className={styles.opCardAmountBlock}>
+                      <span>المبلغ</span>
+                      <strong>{hideAmounts ? "***" : operation.operationVal ? `${operation.operationVal} جنية` : "-"}</strong>
+                    </div>
+                    <div className={styles.opCardAmountBlock}>
+                      <span>العمولة</span>
+                      <strong>{hideAmounts ? "***" : operation.commation ? `${operation.commation} جنية` : "-"}</strong>
+                    </div>
+                  </div>
+                  <dl className={styles.opCardMeta}>
+                    <div className={styles.opCardRow}>
+                      <dt>المستخدم</dt>
+                      <dd>{operation.userName || "-"}</dd>
+                    </div>
+                    <div className={styles.opCardRow}>
+                      <dt>الرقم</dt>
+                      <dd>{opPhoneOrMachine(operation)}</dd>
+                    </div>
+                    <div className={styles.opCardRow}>
+                      <dt>المرسل إليه</dt>
+                      <dd>{operation.receiver || "-"}</dd>
+                    </div>
+                    <div className={styles.opCardRow}>
+                      <dt>ملاحظات</dt>
+                      <dd>{operation.notes || "-"}</dd>
+                    </div>
+                  </dl>
+                  <p className={styles.opCardDate}>{formatDate(operation.createdAt)}</p>
+                </article>
+              ))}
+          </div>
         </div>
       </div>
     </div>

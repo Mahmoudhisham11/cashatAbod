@@ -1,0 +1,64 @@
+.emptyState {
+  width: 100%;
+  padding: 32px 16px;
+  text-align: center;
+  background-color: var(--card-bg);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--secondary-text);
+}
+.emptyState h3 {
+  color: var(--text-color);
+  margin-bottom: 8px;
+}
+
+.skeletonWrap {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+}
+.skeletonRow {
+  height: 52px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(148,163,184,.15) 25%, rgba(148,163,184,.35) 50%, rgba(148,163,184,.15) 75%);
+  background-size: 200% 100%;
+  animation: pulse 1.4s infinite;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000;
+}
+.dialog {
+  width: min(440px, 92vw);
+  background-color: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-lg);
+}
+.dialog h3 {
+  margin-bottom: 6px;
+}
+.dialog p {
+  color: var(--secondary-text);
+  margin-bottom: 16px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+}
+.actions button {
+  flex: 1;
+}
+
+@keyframes pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+

@@ -11,6 +11,8 @@ import { CiLock } from "react-icons/ci";
 import { useRouter } from "next/navigation";
 import CashPop from "../../components/CashPop/page";
 import Developer from "../../components/Developer/page";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
+import { useToast } from "../../components/ui/ToastProvider";
 import { db } from "../../app/firebase";
 import { collection, doc, getDoc, getDocs, updateDoc, deleteDoc, addDoc, Timestamp } from "firebase/firestore";
 
@@ -38,6 +40,8 @@ function Sittings() {
   const [isSubscribe, setIsSubscribe] = useState(true);
   const [profitValue, setProfitValue] = useState("");
   const [profitDate, setProfitDate] = useState("");
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState(false);
+  const { toast } = useToast();
 
   // 🔹 التحقق من صلاحية الدخول
   useEffect(() => {
@@ -81,7 +85,7 @@ function Sittings() {
   useEffect(() => {
     const fetchUsers = async () => {
       const snapshot = await getDocs(collection(db, "users"));
-      const usersList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const usersList = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setUsers(usersList);
     };
     fetchUsers();
@@ -131,7 +135,7 @@ function Sittings() {
     };
     await updateDoc(userRef, updateData);
 
-    alert("✅ تم تحديث صلاحيات المستخدم");
+    toast("تم تحديث صلاحيات المستخدم", "success");
     setOpenPermissions(false);
   };
 
@@ -144,7 +148,7 @@ function Sittings() {
 
     const userRef = doc(db, "users", selectedUserId);
     await updateDoc(userRef, { isSubscribe });
-    alert("✅ تم تحديث حالة الاشتراك");
+    toast("تم تحديث حالة الاشتراك", "success");
     setOpenActivations(false);
   };
 
@@ -155,11 +159,13 @@ function Sittings() {
       return;
     }
 
-    const confirmDelete = window.confirm("⚠️ هل أنت متأكد من حذف هذا المستخدم نهائيًا؟");
-    if (!confirmDelete) return;
+    setConfirmDeleteUser(true);
+  };
 
+  const confirmDeleteUserAction = async () => {
+    setConfirmDeleteUser(false);
     await deleteDoc(doc(db, "users", selectedUserId));
-    alert("✅ تم حذف المستخدم بنجاح");
+    toast("تم حذف المستخدم بنجاح", "success");
     setUsers(prev => prev.filter(u => u.id !== selectedUserId));
     setSelectedUserId("");
     setOpenActivations(false);
@@ -190,7 +196,7 @@ function Sittings() {
         isManualProfit: true
       });
 
-      alert("✅ تم إضافة الأرباح بنجاح");
+      toast("تم إضافة الأرباح بنجاح", "success");
       setProfitValue("");
       setProfitDate("");
       setOpenProfitPopup(false);
@@ -205,6 +211,15 @@ function Sittings() {
 
   return (
     <div className="main">
+      <ConfirmDialog
+        open={confirmDeleteUser}
+        title="حذف المستخدم"
+        description="سيتم حذف المستخدم نهائيًا. هل أنت متأكد؟"
+        confirmText="حذف المستخدم"
+        danger
+        onClose={() => setConfirmDeleteUser(false)}
+        onConfirm={confirmDeleteUserAction}
+      />
       <Developer openDev={openDev} setOpenDev={setOpenDev} />
       <CashPop openCash={openCash} setOpenCash={setOpenCash} />
 

@@ -1,0 +1,37 @@
+.container {
+  position: fixed;
+  left: 16px;
+  bottom: 96px;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  min-width: 220px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  text-align: right;
+}
+
+.success { background-color: var(--success); }
+.error { background-color: var(--danger); }
+.warning { background-color: var(--warning); }
+.info { background-color: var(--primary); }
+
+@media (max-width: 767px) {
+  .container {
+    left: 8px;
+    right: 8px;
+    bottom: 84px;
+  }
+  .toast {
+    width: 100%;
+  }
+}
+

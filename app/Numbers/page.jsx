@@ -1,5 +1,6 @@
 'use client';
 import styles from "./styles.module.css";
+import mainListStyles from "../../components/Main/styles.module.css";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { MdOutlineKeyboardArrowLeft } from "react-icons/md";
@@ -10,6 +11,8 @@ import { db } from "../firebase";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, query, updateDoc, getDocs } from "firebase/firestore";
 import QRCode from "react-qr-code";
 import { useRouter } from "next/navigation";
+import EmptyState from "../../components/ui/EmptyState";
+import { useToast } from "../../components/ui/ToastProvider";
 
 function Numbers() {
     const router = useRouter();
@@ -21,7 +24,6 @@ function Numbers() {
     const [userEmail, setUserEmail] = useState('');
     const [qrNumber, setQrNumber] = useState('');
     const [active, setActive] = useState(0);
-    const [openCard, setOpenCard] = useState('');
     const [openQr, setOpenQr] = useState(false);
     const [numbers, setNumbers] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -29,6 +31,7 @@ function Numbers() {
     const [loading, setLoading] = useState(true);
     const [editId, setEditId] = useState(null);
     const btns = ['اضف خط جديد','كل الخطوط'];
+    const { toast } = useToast();
 
     // 🔹 جلب المستخدم الحالي والتحقق من الصلاحية
     useEffect(() => {
@@ -64,9 +67,9 @@ function Numbers() {
         checkLock();
     }, [router]);
 
-    // 🔹 جلب الخطوط الخاصة بالمستخدم
+    // 🔹 جلب الخطوط
     useEffect(() => {
-        const q = query(collection(db, 'numbers'));
+        const q = query(collection(db, "numbers"));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const numbersSnap = [];
             querySnapshot.forEach((doc) => {
@@ -131,11 +134,11 @@ function Numbers() {
 
         if (editId) {
             await updateDoc(doc(db, "numbers", editId), data);
-            alert("✅ تم تعديل البيانات");
+            toast("تم تعديل البيانات", "success");
             setEditId(null);
         } else {
             await addDoc(collection(db, 'numbers'), data);
-            alert("✅ تم إضافة الخط بنجاح");
+            toast("تم إضافة الخط بنجاح", "success");
         }
 
         setPhone(''); setName(''); setIdNumber(''); setAmount(''); setLimit('');
@@ -158,17 +161,6 @@ function Numbers() {
     const handleQr = (phone) => {
         setQrNumber(phone);
         setOpenQr(true);
-    };
-
-    const handleDeleteAll = async () => {
-        if (!confirm("هل أنت متأكد من حذف جميع البيانات؟")) return;
-        const collectionsToDelete = ['numbers','operations','reports'];
-        for (const col of collectionsToDelete) {
-            const snap = await getDocs(collection(db, col));
-            const deletePromises = snap.docs.map(d => deleteDoc(doc(db, col, d.id)));
-            await Promise.all(deletePromises);
-        }
-        alert("✅ تم حذف كل البيانات");
     };
 
     const filteredNumbers = numbers.filter(n => n.phone.includes(searchTerm));
@@ -195,7 +187,6 @@ function Numbers() {
                         {btns.map((btn,index)=>
                             <button key={index} className={active===index?`${styles.active}`:""} onClick={()=>setActive(index)}>{btn}</button>
                         )}
-                        <button className={styles.deleteAll} onClick={handleDeleteAll}><FaTrashAlt/></button>
                     </div>
 
                     <div className={styles.cardInfo} style={{display: active===0?"flex":"none"}}>
@@ -234,28 +225,97 @@ function Numbers() {
                         <div className="inputContainer">
                             <input type="text" placeholder="ابحث عن رقم" value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)}/>
                         </div>
-                        {filteredNumbers.map((number,index)=>(
-                            <div key={number.id} onClick={()=>setOpenCard(openCard===index?null:index)} className={openCard===index?`${styles.numDiv} ${styles.open}`:`${styles.numDiv}`}>
-                                <div className={styles.divHeader}>
-                                    <h2>{number.phone}</h2>
-                                    <div className={styles.btns}>
-                                        <button onClick={()=>handleQr(number.phone)}><HiQrcode/></button>
-                                        <button onClick={()=>handleEdit(number)}><MdModeEditOutline/></button>
-                                        <button onClick={()=>handleDelet(number.id)}><FaTrashAlt/></button>
-                                    </div>
+                        {filteredNumbers.length === 0 && (
+                            <EmptyState title="لا توجد خطوط" description="أضف خط جديد لبدء العمليات." />
+                        )}
+                        {filteredNumbers.length > 0 && (
+                            <div className={styles.tableWrap}>
+                                <div className={mainListStyles.operationsTable}>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>رقم الخط</th>
+                                                <th>اسم المالك</th>
+                                                <th>الرقم القومي</th>
+                                                <th>الرصيد</th>
+                                                <th>ليمت ارسال</th>
+                                                <th>ليمت استلام</th>
+                                                <th>يومي ارسال</th>
+                                                <th>يومي استلام</th>
+                                                <th>إجراءات</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {filteredNumbers.map((number) => (
+                                                <tr key={number.id}>
+                                                    <td>{number.phone}</td>
+                                                    <td>{number.name || "-"}</td>
+                                                    <td>{number.idNumber || "-"}</td>
+                                                    <td>{Number(number.amount || 0)}</td>
+                                                    <td>{Number(number.depositLimit || 0)}</td>
+                                                    <td>{Number(number.withdrawLimit || 0)}</td>
+                                                    <td>{Number(number.dailyDeposit || 0)}</td>
+                                                    <td>{Number(number.dailyWithdraw || 0)}</td>
+                                                    <td>
+                                                        <div className={styles.actionBtns}>
+                                                            <button type="button" onClick={()=>handleQr(number.phone)}><HiQrcode/></button>
+                                                            <button type="button" onClick={()=>handleEdit(number)}><MdModeEditOutline/></button>
+                                                            <button type="button" onClick={()=>handleDelet(number.id)}><FaTrashAlt/></button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <hr/>
-                                <div className={styles.divFooter}>
-                                    <strong>اسم المالك : {number.name}</strong>
-                                    <strong>الرقم القومي: {number.idNumber}</strong>
-                                    <strong> رصيد الخط: {number.amount}</strong>
-                                    <strong>الليمت المتاح ارسال: {Number(number.depositLimit)}</strong>
-                                    <strong>الليمت المتاح استلام: {Number(number.withdrawLimit)}</strong>
-                                    <strong>الليمت اليومي ارسال: {Number(number.dailyDeposit)}</strong>
-                                    <strong>الليمت اليومي استلام: {Number(number.dailyWithdraw)}</strong>
+                                <div className={mainListStyles.operationsCards}>
+                                    {filteredNumbers.map((number) => (
+                                        <article key={number.id} className={mainListStyles.opCard}>
+                                            <div className={mainListStyles.opCardHeader}>
+                                                <span className={mainListStyles.typeBadgeNeutral}>{number.phone}</span>
+                                                <div className={`${styles.actionBtns} ${styles.actionBtnsInCard}`}>
+                                                    <button type="button" onClick={()=>handleQr(number.phone)}><HiQrcode/></button>
+                                                    <button type="button" onClick={()=>handleEdit(number)}><MdModeEditOutline/></button>
+                                                    <button type="button" onClick={()=>handleDelet(number.id)}><FaTrashAlt/></button>
+                                                </div>
+                                            </div>
+                                            <div className={mainListStyles.opCardAmounts}>
+                                                <div className={mainListStyles.opCardAmountBlock}>
+                                                    <span>الرصيد</span>
+                                                    <strong>{Number(number.amount || 0)}</strong>
+                                                </div>
+                                                <div className={mainListStyles.opCardAmountBlock}>
+                                                    <span>ليمت ارسال</span>
+                                                    <strong>{Number(number.depositLimit || 0)}</strong>
+                                                </div>
+                                                <div className={mainListStyles.opCardAmountBlock}>
+                                                    <span>ليمت استلام</span>
+                                                    <strong>{Number(number.withdrawLimit || 0)}</strong>
+                                                </div>
+                                                <div className={mainListStyles.opCardAmountBlock}>
+                                                    <span>يومي ارسال</span>
+                                                    <strong>{Number(number.dailyDeposit || 0)}</strong>
+                                                </div>
+                                                <div className={`${mainListStyles.opCardAmountBlock} ${styles.amountBlockSpan2}`}>
+                                                    <span>يومي استلام</span>
+                                                    <strong>{Number(number.dailyWithdraw || 0)}</strong>
+                                                </div>
+                                            </div>
+                                            <dl className={mainListStyles.opCardMeta}>
+                                                <div className={mainListStyles.opCardRow}>
+                                                    <dt>اسم المالك</dt>
+                                                    <dd>{number.name || "-"}</dd>
+                                                </div>
+                                                <div className={mainListStyles.opCardRow}>
+                                                    <dt>الرقم القومي</dt>
+                                                    <dd>{number.idNumber || "-"}</dd>
+                                                </div>
+                                            </dl>
+                                        </article>
+                                    ))}
                                 </div>
                             </div>
-                        ))}
+                        )}
                     </div>
                 </div>
             </div>

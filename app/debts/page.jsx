@@ -9,6 +9,10 @@ import { db } from "../firebase";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { useRouter } from "next/navigation";
+import StatusBadge from "../../components/ui/StatusBadge";
+import EmptyState from "../../components/ui/EmptyState";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
+import { useToast } from "../../components/ui/ToastProvider";
 
 function Debts() {
   const router = useRouter();
@@ -36,6 +40,8 @@ function Debts() {
   const [payAmount, setPayAmount] = useState("");
   const [payType, setPayType] = useState("نقدي");
   const [selectedWallet, setSelectedWallet] = useState("");
+  const [confirmDeletePaid, setConfirmDeletePaid] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const checkLock = async () => {
@@ -208,6 +214,11 @@ function Debts() {
   const handlePay = async () => {
     if (!payAmount || Number(payAmount)<=0) { alert("⚠️ ادخل قيمة صحيحة"); return; }
     const amt = Number(payAmount);
+    const remainingAmount = Number(selectedDebt?.amount || 0);
+    if (amt > remainingAmount) {
+      alert("⚠️ لا يمكن سداد مبلغ أكبر من المستحق");
+      return;
+    }
     try {
       if (payType === "نقدي") {
         const cashSnap = await getDocs(collection(db, "cash"));
@@ -251,8 +262,8 @@ function Debts() {
       }
 
       const debtRef = doc(db,"debts",selectedDebt.id);
-      if (amt<selectedDebt.amount) {
-        await updateDoc(debtRef,{amount:selectedDebt.amount-amt});
+      if (amt < remainingAmount) {
+        await updateDoc(debtRef,{amount:remainingAmount-amt});
       } else {
         await updateDoc(debtRef,{amount:0,status:"تم السداد"});
       }
@@ -283,15 +294,19 @@ function Debts() {
 
   // 🔹 زرار حذف المسدد
   const deletePaidDebts = async () => {
-    if (!window.confirm("⚠️ هل أنت متأكد من حذف كل الديون المسددة؟")) return;
+    setConfirmDeletePaid(true);
+  };
+
+  const confirmDeletePaidAction = async () => {
+    setConfirmDeletePaid(false);
     try {
-      const q = query(collection(db,"debts"));
+      const q = query(collection(db, "debts"));
       const snapshot = await getDocs(q);
       const paidDebts = snapshot.docs.filter(d=>d.data().status==="تم السداد");
       for (const d of paidDebts) {
         await deleteDoc(doc(db,"debts",d.id));
       }
-      alert("✅ تم حذف جميع الديون المسددة");
+      toast("تم حذف جميع الديون المسددة", "success");
       fetchDebts();
     } catch(error){ console.error(error); }
   };
@@ -301,6 +316,15 @@ function Debts() {
 
   return (
     <div className={styles.debts}>
+      <ConfirmDialog
+        open={confirmDeletePaid}
+        title="حذف الديون المسددة"
+        description="سيتم حذف جميع الديون التي حالتها تم السداد."
+        confirmText="حذف"
+        danger
+        onClose={() => setConfirmDeletePaid(false)}
+        onConfirm={confirmDeletePaidAction}
+      />
       <div className="header">
         <h2>الديون</h2>
         <Link href={"/"} className="headerLink"><MdOutlineKeyboardArrowLeft/></Link>
@@ -390,26 +414,7 @@ function Debts() {
                     <td>{d.amount} ج.م</td>
                     <td>{d.debtType}</td>
                     <td>{d.payMethod==="محفظة" ? `محفظة - ${d.walletPhone||""}` : "نقدي"}</td>
-                   <td
-                      style={{
-                        backgroundColor:
-                          d.status === "تم السداد"
-                            ? "rgba(122, 255, 122, 0.3)" // خلفية أخضر شفاف
-                            : d.status === "لم يتم السداد"
-                            ? "rgba(255, 255, 122, 0.3)" // خلفية أصفر شفاف
-                            : "",
-                        color:
-                          d.status === "تم السداد"
-                            ? "green" // نص أخضر عادي
-                            : d.status === "لم يتم السداد"
-                            ? "goldenrod" // نص أصفر واضح
-                            : "",
-                        fontWeight: "bold", // يخلي الكلمة أوضح
-                        textAlign: "center", // يخلي النص في النص لو حابب
-                      }}
-                    >
-                      {d.status}
-                  </td>
+                    <td><StatusBadge status={d.status} /></td>
                     <td>{d.date}</td>
                     <td className={styles.actions}>
                       <button onClick={()=>handleEdit(d)}><MdModeEditOutline/></button>
@@ -417,11 +422,10 @@ function Debts() {
                     </td>
                   </tr>
                 ))}
-                {debts.length===0 && (
-                  <tr><td colSpan={8} style={{textAlign:"center"}}>لا يوجد بيانات</td></tr>
-                )}
+                {debts.length===0 && null}
               </tbody>
             </table>
+            {debts.length===0 && <EmptyState title="لا توجد ديون" description="أضف عميل جديد للمتابعة." />}
           </div>
         </div>
       </div>
@@ -454,6 +458,7 @@ function Debts() {
               <div className="inputContainer">
                 <label>قيمة المبلغ:</label>
                 <input type="number" value={payAmount} onChange={e=>setPayAmount(e.target.value)} />
+                <small>المبلغ المستحق: {Number(selectedDebt?.amount || 0)} ج.م</small>
               </div>
               <button className={styles.confirmBtn} onClick={handlePay}>تأكيد السداد</button>
             </div>
