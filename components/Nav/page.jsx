@@ -4,7 +4,6 @@ import Link from "next/link";
 import { TbReportSearch } from "react-icons/tb";
 import { FaHome, FaListAlt } from "react-icons/fa";
 import { FaGear } from "react-icons/fa6";
-import { BiMemoryCard } from "react-icons/bi";
 import { MdOutlineDevices } from "react-icons/md";
 import { usePathname } from "next/navigation";
 
@@ -14,7 +13,6 @@ function Nav() {
         { href: "/", label: "الرئيسية", icon: <FaHome/> },
         { href: "/reports", label: "التقارير", icon: <TbReportSearch/> },
         { href: "/debts", label: "الديون", icon: <FaListAlt/> },
-        { href: "/Numbers", label: "الخطوط", icon: <BiMemoryCard/> },
         { href: "/machines", label: "الماكينات", icon: <MdOutlineDevices/> },
         { href: "/sittings", label: "الاعدادات", icon: <FaGear/> },
     ];
