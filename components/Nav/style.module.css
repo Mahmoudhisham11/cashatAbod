@@ -3,8 +3,8 @@
   bottom: 12px;
   right: 50%;
   transform: translateX(50%);
-  width: min(680px, calc(100% - 24px));
-  height: 72px;
+  width: min(680px, calc(100% - 16px));
+  height: 64px;
   background-color: color-mix(in srgb, var(--nav-color) 90%, transparent);
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -13,17 +13,17 @@
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 8px;
+  padding: 6px;
   z-index: 1000;
 }
 .navLink {
-  min-width: 96px;
-  min-height: 56px;
+  min-width: 78px;
+  min-height: 48px;
   display: flex;
   justify-content: center;
   align-items: center;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   text-decoration: none;
   color: var(--text-color);
   border-radius: 14px;
@@ -31,11 +31,11 @@
 }
 .navLink span {
   line-height: 1.35;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
 }
 .icon {
-  font-size: 20px !important;
+  font-size: 17px !important;
 }
 .navLink:hover {
   background-color: rgba(74, 108, 247, .08);
@@ -94,16 +94,19 @@
 
 @media (max-width: 991px) {
   .nav {
-    bottom: 8px;
-    width: calc(100% - 12px);
-    height: 68px;
-    border-radius: 16px;
+    bottom: 6px;
+    width: calc(100% - 8px);
+    height: 60px;
+    border-radius: 14px;
   }
   .navLink {
-    min-width: 88px;
-    min-height: 52px;
+    min-width: 68px;
+    min-height: 44px;
   }
   .navLink span {
-    font-size: 12px;
+    font-size: 10px;
+  }
+  .icon {
+    font-size: 16px !important;
   }
 }
