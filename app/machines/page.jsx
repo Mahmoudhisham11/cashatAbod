@@ -28,6 +28,7 @@ function Machines() {
   const { toast } = useToast();
 
   const [userEmail, setUserEmail] = useState("");
+  const [currentShop, setCurrentShop] = useState("");
   const [machines, setMachines] = useState([]);
   const [name, setName] = useState("");
   const [balance, setBalance] = useState("");
@@ -42,14 +43,26 @@ function Machines() {
   useEffect(() => {
     const checkLock = async () => {
       const email = localStorage.getItem("email");
+      const shop = localStorage.getItem("shop");
       setUserEmail(email);
       if (!email) {
         router.push("/");
         return;
       }
+      if (!shop) {
+        alert("⚠️ لا يوجد فرع محدد للحساب");
+        router.push("/");
+        return;
+      }
+      setCurrentShop(shop);
 
-      const snapshot = await getDocs(collection(db, "users"));
-      const currentUserDoc = snapshot.docs.find((d) => d.data().email === email);
+      const userQ = query(
+        collection(db, "users"),
+        where("email", "==", email),
+        where("shop", "==", shop)
+      );
+      const snapshot = await getDocs(userQ);
+      const currentUserDoc = snapshot.docs[0];
 
       if (!currentUserDoc) {
         router.push("/");
@@ -71,11 +84,12 @@ function Machines() {
   }, [router]);
 
   useEffect(() => {
-    if (!userEmail || !authorized) return;
+    if (!userEmail || !authorized || !currentShop) return;
 
     const q = query(
       collection(db, "machines"),
-      where("userEmail", "==", userEmail)
+      where("userEmail", "==", userEmail),
+      where("shop", "==", currentShop)
     );
 
     const unsub = onSnapshot(
@@ -97,11 +111,11 @@ function Machines() {
     );
 
     return () => unsub();
-  }, [userEmail, authorized]);
+  }, [userEmail, authorized, currentShop]);
 
   const handelAddMachine = async () => {
     if (!name.trim()) return alert("⚠️ من فضلك ادخل اسم الماكينة");
-    if (!userEmail) return;
+    if (!userEmail || !currentShop) return;
 
     const bal = Number(balance);
     if (balance === "" || Number.isNaN(bal)) {
@@ -113,6 +127,7 @@ function Machines() {
       name: name.trim(),
       balance: bal,
       userEmail,
+      shop: currentShop,
     };
 
     try {

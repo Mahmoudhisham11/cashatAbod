@@ -37,6 +37,7 @@ function Main() {
   const [openCash, setOpenCash] = useState(false);
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [currentShop, setCurrentShop] = useState('');
   const [wallet, setWallet] = useState(0);
   const [cash, setCash] = useState(0);
   const [profit, setProfit] = useState(0);
@@ -78,12 +79,18 @@ function Main() {
   useEffect(() => {
     const storageName = localStorage.getItem("name");
     const storageEmail = localStorage.getItem("email");
-    if (storageName) {
+    const storageShop = localStorage.getItem("shop");
+    if (storageName && storageEmail && storageShop) {
       setUserName(storageName);
       setUserEmail(storageEmail);
+      setCurrentShop(storageShop);
       // جلب lockMoney و lockDaily من Firestore لكل مستخدم مع live updates
       // جلب بيانات المستخدم مع live updates + فحص الاشتراك
-const usersQ = query(collection(db, "users"), where("email", "==", storageEmail));
+const usersQ = query(
+  collection(db, "users"),
+  where("email", "==", storageEmail),
+  where("shop", "==", storageShop)
+);
 const unsubUser = onSnapshot(
   usersQ,
   (qs) => {
@@ -112,14 +119,15 @@ const unsubUser = onSnapshot(
 
   // SUBSCRIBE TO NUMBERS / OPERATIONS / CASH (live)
   useEffect(() => {
-    const numQ = query(collection(db, "numbers"));
+    if (!currentShop) return;
+    const numQ = query(collection(db, "numbers"), where("shop", "==", currentShop));
     const unsubNum = onSnapshot(numQ, (qs) => {
       const arr = [];
       qs.forEach(d => arr.push({ ...d.data(), id: d.id }));
       setNums(arr);
     });
 
-    const opQ = query(collection(db, "operations"));
+    const opQ = query(collection(db, "operations"), where("shop", "==", currentShop));
     const unsubOp = onSnapshot(opQ, (qs) => {
       const arr = qs.docs.map((d) => ({ ...d.data(), id: d.id }));
       arr.sort((a, b) => {
@@ -139,7 +147,7 @@ const unsubUser = onSnapshot(
       setOperations(arr);
     });
 
-    const cashQ = query(collection(db, "cash"));
+    const cashQ = query(collection(db, "cash"), where("shop", "==", currentShop));
     const unsubCash = onSnapshot(cashQ, (qs) => {
       let totalCash = 0;
       qs.forEach((doc) => {
@@ -153,7 +161,7 @@ const unsubUser = onSnapshot(
       try { unsubOp(); } catch (e) {}
       try { unsubCash(); } catch (e) {}
     };
-  }, []);
+  }, [currentShop]);
 
   // CALCULATE PROFIT, WALLET TOTAL, CAPITAL
   useEffect(() => {
@@ -197,6 +205,7 @@ const unsubUser = onSnapshot(
 
   // handle delete
   const handelDelete = async (id) => {
+    if (!currentShop) return;
     if (lockDaily) {
       alert("⚠️ لا يمكنك حذف العمليات اليومية، الصلاحية مقفولة.");
       toast("صلاحية الحذف اليومي غير متاحة", "warning");
@@ -240,7 +249,7 @@ const unsubUser = onSnapshot(
         const machineBalance = Number(machineData.balance ?? 0);
         const t = type.toLowerCase();
 
-        const cashSnap = await getDocs(collection(db, "cash"));
+        const cashSnap = await getDocs(query(collection(db, "cash"), where("shop", "==", currentShop)));
         const cashDocSnap = cashSnap.docs[0] ?? null;
         let cashRef = cashDocSnap ? doc(db, "cash", cashDocSnap.id) : null;
         let cashVal = cashDocSnap ? Number(cashDocSnap.data().cashVal ?? cashDocSnap.data().cash ?? 0) : 0;
@@ -281,6 +290,7 @@ const unsubUser = onSnapshot(
           await addDoc(collection(db, "cash"), {
             cashVal: newCashVal,
             createdAt: serverTimestamp(),
+            shop: currentShop,
           });
         }
 
@@ -299,7 +309,7 @@ const unsubUser = onSnapshot(
         return;
       }
 
-      const numbersSnap = await getDocs(collection(db, "numbers"));
+      const numbersSnap = await getDocs(query(collection(db, "numbers"), where("shop", "==", currentShop)));
       const numberDocSnap = numbersSnap.docs.find((d) => {
         const data = d.data();
         return data.phone === phone || data.phoneNumber === phone;
@@ -321,7 +331,7 @@ const unsubUser = onSnapshot(
       const numberWithdrawLimit = Number(numberData.withdrawLimit ?? 0);
       const numberDaily = Number(numberData.dailyWithdraw ?? numberData.daily ?? 0);
 
-      const cashSnap = await getDocs(collection(db, "cash"));
+      const cashSnap = await getDocs(query(collection(db, "cash"), where("shop", "==", currentShop)));
       const cashDocSnap = cashSnap.docs[0] ?? null;
       let cashRef = cashDocSnap ? doc(db, "cash", cashDocSnap.id) : null;
       let cashVal = cashDocSnap ? Number(cashDocSnap.data().cashVal ?? cashDocSnap.data().cash ?? 0) : 0;
@@ -374,6 +384,7 @@ const unsubUser = onSnapshot(
         await addDoc(collection(db, "cash"), {
           cashVal: newCashVal,
           createdAt: serverTimestamp(),
+          shop: currentShop,
         });
       }
 
@@ -396,9 +407,10 @@ const unsubUser = onSnapshot(
   };
 
   const confirmCloseDayAction = async () => {
+    if (!currentShop) return;
     setConfirmDayClose(false);
     try {
-      const opQ = query(collection(db, "operations"));
+      const opQ = query(collection(db, "operations"), where("shop", "==", currentShop));
       const querySnapshot = await getDocs(opQ);
       if (querySnapshot.empty) {
         toast("لا توجد عمليات اليوم", "warning");
@@ -409,6 +421,7 @@ const unsubUser = onSnapshot(
         await addDoc(collection(db, "reports"), {
           ...data,
           archivedAt: new Date().toISOString(),
+          shop: currentShop,
         });
         await deleteDoc(doc(db, "operations", docSnap.id));
       }

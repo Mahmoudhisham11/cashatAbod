@@ -31,6 +31,7 @@ function Reports() {
   const [phoneSearch, setPhoneSearch] = useState('');
   const [operationFilter, setOperationFilter] = useState('');
   const [email, setEmail] = useState('');
+  const [currentShop, setCurrentShop] = useState('');
   const [total, setTotal] = useState(0);
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -43,14 +44,29 @@ function Reports() {
   useEffect(() => {
     const checkLockAndSetEmail = async () => {
       const userEmail = localStorage.getItem("email");
+      const shop = localStorage.getItem("shop");
       if (!userEmail) {
+        router.push('/');
+        return;
+      }
+      if (!shop) {
+        setInfoDialog({
+          open: true,
+          title: "لا يوجد فرع",
+          description: "لا يوجد اسم فرع محفوظ للحساب الحالي.",
+        });
         router.push('/');
         return;
       }
 
       setEmail(userEmail);
+      setCurrentShop(shop);
 
-      const q = query(collection(db, "users"), where("email", "==", userEmail));
+      const q = query(
+        collection(db, "users"),
+        where("email", "==", userEmail),
+        where("shop", "==", shop)
+      );
       const snapshot = await getDocs(q);
 
       if (!snapshot.empty) {
@@ -78,7 +94,8 @@ function Reports() {
   }, []);
 
   const fetchCashBalance = async () => {
-    const cashSnap = await getDocs(collection(db, "cash"));
+    if (!currentShop) return;
+    const cashSnap = await getDocs(query(collection(db, "cash"), where("shop", "==", currentShop)));
     let balance = 0;
     cashSnap.forEach((docSnap) => {
       const data = docSnap.data();
@@ -88,9 +105,9 @@ function Reports() {
   };
 
   const fetchReports = async () => {
-    if (!authorized || !email) return;
+    if (!authorized || !email || !currentShop) return;
 
-    const q = query(collection(db, "reports"));
+    const q = query(collection(db, "reports"), where("shop", "==", currentShop));
     const querySnapshot = await getDocs(q);
 
     const allReports = [];
@@ -128,11 +145,11 @@ function Reports() {
   };
 
   useEffect(() => {
-    if (authorized) {
+    if (authorized && currentShop) {
       fetchReports();
       fetchCashBalance();
     }
-  }, [authorized, dateFrom, dateTo, phoneSearch, email]);
+  }, [authorized, dateFrom, dateTo, phoneSearch, email, currentShop]);
 
   useEffect(() => {
     let filteredReports = reports;
@@ -149,9 +166,10 @@ function Reports() {
   };
 
   const confirmDeleteAllAction = async () => {
+    if (!currentShop) return;
     setConfirmDeleteAll(false);
     try {
-      const q = query(collection(db, "reports"));
+      const q = query(collection(db, "reports"), where("shop", "==", currentShop));
       const querySnapshot = await getDocs(q);
       const deletePromises = querySnapshot.docs.map((docSnap) =>
         deleteDoc(doc(db, "reports", docSnap.id))
@@ -208,7 +226,7 @@ function Reports() {
     const sumReceiveComm = receiveReports.reduce((acc, r) => acc + Number(r.commation || 0), 0);
 
     // المحافظ
-    const numbersSnap = await getDocs(query(collection(db, "numbers")));
+    const numbersSnap = await getDocs(query(collection(db, "numbers"), where("shop", "==", currentShop)));
     let wallets = [];
     let totalWallets = 0;
     numbersSnap.forEach((docSnap) => {
@@ -218,7 +236,7 @@ function Reports() {
     });
 
     // ✅ الديون
-    const debtsSnap = await getDocs(collection(db, "debts"));
+    const debtsSnap = await getDocs(query(collection(db, "debts"), where("shop", "==", currentShop)));
     let debts = [];
     debtsSnap.forEach((docSnap) => {
       const data = docSnap.data();

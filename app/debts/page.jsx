@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { MdOutlineKeyboardArrowLeft, MdModeEditOutline } from "react-icons/md";
 import { FaRegMoneyBillAlt, FaTimes } from "react-icons/fa";
-import { collection, addDoc, getDocs, query, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, doc, updateDoc, deleteDoc, where } from "firebase/firestore";
 import { db } from "../firebase";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -32,6 +32,7 @@ function Debts() {
   const [totalLik, setTotalLik] = useState(0);
   const [totalAlyek, setTotalAlyek] = useState(0);
   const [userEmail, setUserEmail] = useState("");
+  const [currentShop, setCurrentShop] = useState("");
   const [wallets, setWallets] = useState([]);
   const [cashVal, setCashVal] = useState(0);
 
@@ -46,14 +47,26 @@ function Debts() {
   useEffect(() => {
     const checkLock = async () => {
       const email = localStorage.getItem("email");
+      const shop = localStorage.getItem("shop");
       if (!email) {
         router.push('/');
         return;
       }
+      if (!shop) {
+        alert("⚠️ لا يوجد فرع محدد للحساب");
+        router.push('/');
+        return;
+      }
       setUserEmail(email);
+      setCurrentShop(shop);
 
-      const snapshot = await getDocs(collection(db, "users"));
-      const currentUserDoc = snapshot.docs.find(doc => doc.data().email === email);
+      const userQ = query(
+        collection(db, "users"),
+        where("email", "==", email),
+        where("shop", "==", shop)
+      );
+      const snapshot = await getDocs(userQ);
+      const currentUserDoc = snapshot.docs[0];
 
       if (!currentUserDoc) {
         router.push('/');
@@ -75,15 +88,16 @@ function Debts() {
   }, [router]);
 
   useEffect(() => {
-    if (!authorized || !userEmail) return;
+    if (!authorized || !userEmail || !currentShop) return;
     fetchDebts();
     fetchWallets();
     fetchCash();
-  }, [authorized, userEmail]);
+  }, [authorized, userEmail, currentShop]);
 
   const fetchDebts = async () => {
+    if (!currentShop) return;
     try {
-      const q = query(collection(db, "debts"));
+      const q = query(collection(db, "debts"), where("shop", "==", currentShop));
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setDebts(data);
@@ -100,16 +114,18 @@ function Debts() {
   };
 
   const fetchWallets = async () => {
+    if (!currentShop) return;
     try {
-      const q = query(collection(db, "numbers"));
+      const q = query(collection(db, "numbers"), where("shop", "==", currentShop));
       const snapshot = await getDocs(q);
       setWallets(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (error) { console.error(error); }
   };
 
   const fetchCash = async () => {
+    if (!currentShop) return;
     try {
-      const q = query(collection(db, "cash"));
+      const q = query(collection(db, "cash"), where("shop", "==", currentShop));
       const snapshot = await getDocs(q);
       let totalCash = 0;
       snapshot.forEach(docSnap => totalCash += Number(docSnap.data().cashVal || 0));
@@ -118,12 +134,12 @@ function Debts() {
   };
 
   const handleSubmit = async () => {
-    if (!userEmail) return;
+    if (!userEmail || !currentShop) return;
     if (!clientName || !amount) { alert("⚠️ من فضلك املأ جميع الحقول"); return; }
     const debtAmount = Number(amount);
     try {
       if (payMethod === "نقدي") {
-        const cashSnap = await getDocs(collection(db, "cash"));
+        const cashSnap = await getDocs(query(collection(db, "cash"), where("shop", "==", currentShop)));
         if (!cashSnap.empty) {
           const cashDocId = cashSnap.docs[0].id;
           const cashData = cashSnap.docs[0].data();
@@ -176,6 +192,7 @@ function Debts() {
         walletId: payMethod==="محفظة"?walletId:null,
         walletPhone: walletPhone,
         userEmail, 
+        shop: currentShop,
         date: new Date().toLocaleString("ar-EG"),
         status: "لم يتم السداد"
       };
@@ -212,6 +229,7 @@ function Debts() {
   };
 
   const handlePay = async () => {
+    if (!currentShop) return;
     if (!payAmount || Number(payAmount)<=0) { alert("⚠️ ادخل قيمة صحيحة"); return; }
     const amt = Number(payAmount);
     const remainingAmount = Number(selectedDebt?.amount || 0);
@@ -221,7 +239,7 @@ function Debts() {
     }
     try {
       if (payType === "نقدي") {
-        const cashSnap = await getDocs(collection(db, "cash"));
+        const cashSnap = await getDocs(query(collection(db, "cash"), where("shop", "==", currentShop)));
         if (!cashSnap.empty) {
           const cashDocId = cashSnap.docs[0].id;
           const cashData = cashSnap.docs[0].data();
@@ -298,9 +316,10 @@ function Debts() {
   };
 
   const confirmDeletePaidAction = async () => {
+    if (!currentShop) return;
     setConfirmDeletePaid(false);
     try {
-      const q = query(collection(db, "debts"));
+      const q = query(collection(db, "debts"), where("shop", "==", currentShop));
       const snapshot = await getDocs(q);
       const paidDebts = snapshot.docs.filter(d=>d.data().status==="تم السداد");
       for (const d of paidDebts) {

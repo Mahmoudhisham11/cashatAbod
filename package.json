@@ -6,7 +6,8 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "add:shop-field": "node scripts/add-shop-field.mjs"
   },
   "dependencies": {
     "browserslist": "^4.28.1",

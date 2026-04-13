@@ -14,7 +14,7 @@ import Developer from "../../components/Developer/page";
 import ConfirmDialog from "../../components/ui/ConfirmDialog";
 import { useToast } from "../../components/ui/ToastProvider";
 import { db } from "../../app/firebase";
-import { collection, doc, getDoc, getDocs, updateDoc, deleteDoc, addDoc, Timestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, updateDoc, deleteDoc, addDoc, Timestamp, query, where } from "firebase/firestore";
 
 function Sittings() {
   const router = useRouter();
@@ -24,6 +24,7 @@ function Sittings() {
   const [openActivations, setOpenActivations] = useState(false);
   const [openProfitPopup, setOpenProfitPopup] = useState(false);
   const [userName, setUserName] = useState('');
+  const [currentShop, setCurrentShop] = useState('');
   const [users, setUsers] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState("");
   const [locks, setLocks] = useState({
@@ -47,13 +48,25 @@ function Sittings() {
   useEffect(() => {
     const checkLock = async () => {
       const email = localStorage.getItem("email");
+      const shop = localStorage.getItem("shop");
       if (!email) {
         router.push('/');
         return;
       }
+      if (!shop) {
+        alert("⚠️ لا يوجد فرع محدد للحساب");
+        router.push('/');
+        return;
+      }
+      setCurrentShop(shop);
 
-      const snapshot = await getDocs(collection(db, "users"));
-      const currentUserDoc = snapshot.docs.find(doc => doc.data().email === email);
+      const userQ = query(
+        collection(db, "users"),
+        where("email", "==", email),
+        where("shop", "==", shop)
+      );
+      const snapshot = await getDocs(userQ);
+      const currentUserDoc = snapshot.docs[0];
 
       if (!currentUserDoc) {
         router.push('/');
@@ -84,12 +97,14 @@ function Sittings() {
   // 🔹 تحميل كل المستخدمين
   useEffect(() => {
     const fetchUsers = async () => {
-      const snapshot = await getDocs(collection(db, "users"));
+      if (!currentShop) return;
+      const usersQ = query(collection(db, "users"), where("shop", "==", currentShop));
+      const snapshot = await getDocs(usersQ);
       const usersList = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setUsers(usersList);
     };
     fetchUsers();
-  }, []);
+  }, [currentShop]);
 
   // 🔹 تحميل صلاحيات المستخدم
   useEffect(() => {
@@ -172,6 +187,7 @@ function Sittings() {
   };
 
   const handleAddProfit = async () => {
+    if (!currentShop) return;
     const parsedProfit = Number(profitValue);
     if (!profitDate) {
       alert("⚠️ اختر تاريخ الأرباح");
@@ -193,7 +209,8 @@ function Sittings() {
         userName: userName || "admin",
         date: selectedDate.toISOString(),
         createdAt: Timestamp.fromDate(selectedDate),
-        isManualProfit: true
+        isManualProfit: true,
+        shop: currentShop,
       });
 
       toast("تم إضافة الأرباح بنجاح", "success");

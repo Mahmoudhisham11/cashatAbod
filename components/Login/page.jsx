@@ -19,6 +19,7 @@ function Login() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [shop, setShop] = useState("");
 
   // ✅ State للتحكم في Popup
   const [showPopup, setShowPopup] = useState(false);
@@ -30,7 +31,7 @@ function Login() {
 
   // CREATE NEW ACCOUNT
   const handleCreatAcc = async () => {
-    if (name !== "" && email !== "" && password !== "") {
+    if (name !== "" && email !== "" && password !== "" && shop.trim() !== "") {
       const userRef = collection(db, "users");
       const q = query(userRef, where("email", "==", email));
       const querySnapshot = await getDocs(q);
@@ -39,6 +40,7 @@ function Login() {
           name,
           email,
           password,
+          shop: shop.trim(),
           isSubscribe: false, // ✅ الاشتراك الافتراضي يكون false
           date: serverTimestamp(),
         });
@@ -46,6 +48,7 @@ function Login() {
         setName("");
         setEmail("");
         setPassword("");
+        setShop("");
       } else {
         alert("⚠️ المستخدم موجود بالفعل");
       }
@@ -74,6 +77,7 @@ function Login() {
         if (typeof window !== "undefined") {
           localStorage.setItem("email", email);
           localStorage.setItem("name", userData.name);
+          localStorage.setItem("shop", userData.shop || "");
         }
         if (typeof window !== "undefined") {
           window.location.reload();
@@ -185,6 +189,7 @@ function Login() {
               <label>البريد الالكتروني :</label>
               <input
                 type="email"
+                value={email}
                 placeholder="ادخل بريدك الالكتروني"
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -193,6 +198,7 @@ function Login() {
               <label>كلمة المرور :</label>
               <input
                 type="password"
+                value={password}
                 placeholder="ادخل كلمة المرور الخاصة بك"
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -236,6 +242,15 @@ function Login() {
                 value={password}
                 placeholder="ادخل كلمة المرور الخاصة بك"
                 onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <div className="inputContainer">
+              <label>اسم الفرع :</label>
+              <input
+                type="text"
+                value={shop}
+                placeholder="ادخل اسم الفرع"
+                onChange={(e) => setShop(e.target.value)}
               />
             </div>
             <button className={styles.fromBtn} onClick={handleCreatAcc}>

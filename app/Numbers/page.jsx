@@ -8,7 +8,7 @@ import { HiQrcode } from "react-icons/hi";
 import { FaTrashAlt } from "react-icons/fa";
 import { MdModeEditOutline } from "react-icons/md";
 import { db } from "../firebase";
-import { addDoc, collection, deleteDoc, doc, onSnapshot, query, updateDoc, getDocs } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, onSnapshot, query, updateDoc, getDocs, where } from "firebase/firestore";
 import QRCode from "react-qr-code";
 import { useRouter } from "next/navigation";
 import EmptyState from "../../components/ui/EmptyState";
@@ -22,6 +22,7 @@ function Numbers() {
     const [amount, setAmount] = useState('');
     const [limit, setLimit] = useState('');
     const [userEmail, setUserEmail] = useState('');
+    const [currentShop, setCurrentShop] = useState('');
     const [qrNumber, setQrNumber] = useState('');
     const [active, setActive] = useState(0);
     const [openQr, setOpenQr] = useState(false);
@@ -37,14 +38,26 @@ function Numbers() {
     useEffect(() => {
         const checkLock = async () => {
             const email = localStorage.getItem("email");
+            const shop = localStorage.getItem("shop");
             setUserEmail(email);
             if (!email) {
                 router.push('/');
                 return;
             }
+            if (!shop) {
+                alert("⚠️ لا يوجد فرع محدد للحساب");
+                router.push('/');
+                return;
+            }
+            setCurrentShop(shop);
 
-            const snapshot = await getDocs(collection(db, "users"));
-            const currentUserDoc = snapshot.docs.find(doc => doc.data().email === email);
+            const userQ = query(
+                collection(db, "users"),
+                where("email", "==", email),
+                where("shop", "==", shop)
+            );
+            const snapshot = await getDocs(userQ);
+            const currentUserDoc = snapshot.docs[0];
 
             if (!currentUserDoc) {
                 router.push('/');
@@ -69,7 +82,8 @@ function Numbers() {
 
     // 🔹 جلب الخطوط
     useEffect(() => {
-        const q = query(collection(db, "numbers"));
+        if (!currentShop) return;
+        const q = query(collection(db, "numbers"), where("shop", "==", currentShop));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const numbersSnap = [];
             querySnapshot.forEach((doc) => {
@@ -79,7 +93,7 @@ function Numbers() {
             setNumbers(numbersSnap);
         });
         return () => unsubscribe();
-    }, []);
+    }, [currentShop]);
 
 
     // 🔹 إعادة ضبط الليمت اليومي والشهري
@@ -116,7 +130,7 @@ function Numbers() {
     // ⭐ إضافة/تعديل خط
     const handelAddNumber = async () => {
         if (!phone) return alert("⚠️ من فضلك ادخل رقم الخط");
-        if (!userEmail) return;
+        if (!userEmail || !currentShop) return;
 
         const data = {
             phone,
@@ -130,6 +144,7 @@ function Numbers() {
             dailyWithdraw: 60000,
             dailyDeposit: 60000,
             userEmail,
+            shop: currentShop,
         };
 
         if (editId) {
