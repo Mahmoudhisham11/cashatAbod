@@ -89,6 +89,12 @@ function Wallet({ openWallet, setOpenWallet }) {
   }, [machineId, machines, sourceType]);
 
   const handleWalletAdd = async () => {
+    const shop = localStorage.getItem("shop");
+    if (!shop) {
+      toast("لا يوجد فرع محدد للحساب", "error");
+      return;
+    }
+
     if (!operationVal || isNaN(Number(operationVal))) {
       toast("قيمة العملية غير صالحة", "error");
       return;
@@ -115,6 +121,7 @@ function Wallet({ openWallet, setOpenWallet }) {
         commation,
         operationVal,
         userName: localStorage.getItem("name"),
+        shop,
         phone: "",
         type: "استلام",
         notes,
@@ -168,6 +175,7 @@ function Wallet({ openWallet, setOpenWallet }) {
       commation,
       operationVal,
       userName: localStorage.getItem("name"),
+      shop,
       phone,
       type: "استلام",
       notes,

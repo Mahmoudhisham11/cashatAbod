@@ -9,6 +9,7 @@ function CashPop({ openCash, setOpenCash }) {
   const [operationVal, setOperationVal] = useState(""); // قيمة العملية
   const [notes, setNotes] = useState(""); 
   const [userEmail, setUserEmail] = useState("");
+  const [currentShop, setCurrentShop] = useState("");
   const [existingCashId, setExistingCashId] = useState(null);
   const [currentCash, setCurrentCash] = useState(0); // الرصيد الحالي
   const [newCash, setNewCash] = useState(0); // الرصيد بعد العملية
@@ -18,8 +19,12 @@ function CashPop({ openCash, setOpenCash }) {
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storageEmail = localStorage.getItem("email");
+      const storageShop = localStorage.getItem("shop");
       if (storageEmail) {
         setUserEmail(storageEmail);
+      }
+      if (storageShop) {
+        setCurrentShop(storageShop);
       }
     }
   }, []);
@@ -57,6 +62,11 @@ function CashPop({ openCash, setOpenCash }) {
   // تنفيذ العملية
   const handleSaveCash = async () => {
     const val = Number(operationVal);
+    if (!currentShop) {
+      alert("⚠️ لا يوجد فرع محدد للحساب");
+      return;
+    }
+
     if (!val || val <= 0) {
       alert("من فضلك ادخل قيمة صالحة للعملية");
       return;
@@ -81,6 +91,7 @@ function CashPop({ openCash, setOpenCash }) {
         cashVal: newCash,
         notes: notes || "",
         userEmail,
+        shop: currentShop,
         createdAt: serverTimestamp(),
       });
       setExistingCashId(newCashDoc.id);
@@ -89,6 +100,7 @@ function CashPop({ openCash, setOpenCash }) {
     // تسجيل العملية في operations
     await addDoc(collection(db, "operations"), {
       userEmail,
+      shop: currentShop,
       type: operationType === "deposit" ? "ايداع نقدي" : "سحب نقدي",
       operationVal: val,
       notes: notes || "",

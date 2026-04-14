@@ -51,6 +51,12 @@ function Cash({ openCash, setOpenCash }) {
   }, [phone, phoneNumbers]);
 
   const handleCashAdd = async () => {
+    const shop = localStorage.getItem("shop");
+    if (!shop) {
+      alert("⚠️ لا يوجد فرع محدد للحساب");
+      return;
+    }
+
     if (!phone || phone.trim() === "") {
       alert("من فضلك اختر رقم الشريحة");
       return;
@@ -89,6 +95,7 @@ function Cash({ openCash, setOpenCash }) {
       commation,
       operationVal,
       userName: localStorage.getItem('name'),
+      shop,
       phone,
       notes,
       receiver,
