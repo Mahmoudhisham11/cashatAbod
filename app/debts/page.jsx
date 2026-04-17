@@ -2,7 +2,7 @@
 import styles from "./styles.module.css";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { MdOutlineKeyboardArrowLeft, MdModeEditOutline } from "react-icons/md";
+import { MdOutlineKeyboardArrowLeft, MdModeEditOutline, MdOutlineFileUpload } from "react-icons/md";
 import { FaRegMoneyBillAlt, FaTimes } from "react-icons/fa";
 import { collection, addDoc, getDocs, query, doc, updateDoc, deleteDoc, where } from "firebase/firestore";
 import { db } from "../firebase";
@@ -42,8 +42,132 @@ function Debts() {
   const [payType, setPayType] = useState("نقدي");
   const [selectedWallet, setSelectedWallet] = useState("");
   const [confirmDeletePaid, setConfirmDeletePaid] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
+  const [existingImageUrl, setExistingImageUrl] = useState("");
+  const [existingImagePublicId, setExistingImagePublicId] = useState("");
+  const [removeImageOnEdit, setRemoveImageOnEdit] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageInputKey, setImageInputKey] = useState(0);
+  const [zoomedImageUrl, setZoomedImageUrl] = useState("");
   const { toast } = useToast();
 
+  const uploadImageToCloudinary = async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "cashat_abod");
+
+    const response = await fetch("https://api.cloudinary.com/v1_1/drtdv4iyr/image/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result?.secure_url || !result?.public_id) {
+      throw new Error(result?.error?.message || "فشل رفع الصورة إلى Cloudinary");
+    }
+
+    return {
+      imageUrl: result.secure_url,
+      imagePublicId: result.public_id,
+    };
+  };
+
+  const resetImageState = () => {
+    setSelectedImageFile(null);
+    setImagePreviewUrl("");
+    setExistingImageUrl("");
+    setExistingImagePublicId("");
+    setRemoveImageOnEdit(false);
+    setImageInputKey((prev) => prev + 1);
+  };
+
+  const deleteImageByPublicId = async (publicId) => {
+    if (!publicId) {
+      console.log("[delete-image] Skip: missing publicId");
+      return;
+    }
+
+    console.log("[delete-image] Requesting delete for publicId:", publicId);
+    const response = await fetch("/api/delete-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ publicId }),
+    });
+
+    const raw = await response.text();
+    let data = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      data = { error: raw || "Unknown API response" };
+    }
+
+    if (!response.ok || !data?.success) {
+      console.warn("[delete-image] API failed:", {
+        status: response.status,
+        statusText: response.statusText,
+        data,
+      });
+      throw new Error(
+        data?.error || `فشل حذف الصورة من Cloudinary (status ${response.status})`
+      );
+    }
+
+    console.log("[delete-image] Deleted successfully:", publicId);
+  };
+
+  const deleteDebtWithImageCleanup = async (debt) => {
+    if (!debt?.id) throw new Error("Debt id is required");
+
+    try {
+      if (debt.imagePublicId) {
+        try {
+          await deleteImageByPublicId(debt.imagePublicId);
+        } catch (imageError) {
+          // Do not block debt deletion if Cloudinary cleanup fails.
+          // This keeps settlement flow working even when server credentials are missing.
+          console.warn(
+            "[delete-debt] Cloudinary delete failed, continuing Firestore delete:",
+            imageError
+          );
+          toast(
+            "تم حذف الدين، لكن تعذر حذف الصورة من Cloudinary. راجع إعدادات السيرفر.",
+            "warning"
+          );
+        }
+      } else {
+        console.log("[delete-debt] No imagePublicId, skipping image deletion for debt:", debt.id);
+      }
+
+      await deleteDoc(doc(db, "debts", debt.id));
+      console.log("[delete-debt] Firestore document deleted:", debt.id);
+    } catch (error) {
+      console.error("[delete-debt] Failed to delete debt with image cleanup:", error);
+      throw error;
+    }
+  };
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setSelectedImageFile(null);
+      setImagePreviewUrl("");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      alert("⚠️ الملف المختار ليس صورة");
+      event.target.value = "";
+      setSelectedImageFile(null);
+      setImagePreviewUrl("");
+      return;
+    }
+
+    setSelectedImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setRemoveImageOnEdit(false);
+  };
   useEffect(() => {
     const checkLock = async () => {
       const email = localStorage.getItem("email");
@@ -134,8 +258,13 @@ function Debts() {
   };
 
   const handleSubmit = async () => {
+    if (isUploadingImage) return;
     if (!userEmail || !currentShop) return;
     if (!clientName || !amount) { alert("⚠️ من فضلك املأ جميع الحقول"); return; }
+    if (!editId && !selectedImageFile) {
+      alert("⚠️ صورة الدين مطلوبة");
+      return;
+    }
     const debtAmount = Number(amount);
     try {
       if (payMethod === "نقدي") {
@@ -183,6 +312,18 @@ function Debts() {
         ? wallets.find(w=>w.id===walletId)?.phone || "" 
         : null;
 
+      let finalImageUrl = existingImageUrl || "";
+      let finalImagePublicId = existingImagePublicId || "";
+      if (selectedImageFile) {
+        setIsUploadingImage(true);
+        const uploaded = await uploadImageToCloudinary(selectedImageFile);
+        finalImageUrl = uploaded.imageUrl;
+        finalImagePublicId = uploaded.imagePublicId;
+        setIsUploadingImage(false);
+      } else if (editId && removeImageOnEdit) {
+        finalImageUrl = "";
+        finalImagePublicId = "";
+      }
       const debtData = {
         clientName,
         userName: localStorage.getItem('name'), 
@@ -194,7 +335,9 @@ function Debts() {
         userEmail, 
         shop: currentShop,
         date: new Date().toLocaleString("ar-EG"),
-        status: "لم يتم السداد"
+        status: "لم يتم السداد",
+        imageUrl: finalImageUrl,
+        imagePublicId: finalImagePublicId
       };
 
       if (editId) {
@@ -206,8 +349,14 @@ function Debts() {
       }
 
       setClientName(""); setAmount(""); setDebtType("ليك"); setPayMethod("نقدي"); setWalletId(""); setEditId(null);
+      resetImageState();
       fetchDebts();
-    } catch (error) { console.error(error); }
+    } catch (error) {
+      console.error(error);
+      alert("❌ حدث خطأ أثناء رفع الصورة أو حفظ الدين");
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const handleEdit = (debt) => {
@@ -216,6 +365,12 @@ function Debts() {
     setDebtType(debt.debtType);
     setPayMethod(debt.payMethod || "نقدي");
     setWalletId(debt.walletId || "");
+    setExistingImageUrl(debt.imageUrl || "");
+    setExistingImagePublicId(debt.imagePublicId || "");
+    setRemoveImageOnEdit(false);
+    setSelectedImageFile(null);
+    setImagePreviewUrl("");
+    setImageInputKey((prev) => prev + 1);
     setEditId(debt.id);
     setActive(0);
   };
@@ -279,11 +434,11 @@ function Debts() {
         fetchWallets();
       }
 
-      const debtRef = doc(db,"debts",selectedDebt.id);
       if (amt < remainingAmount) {
+        const debtRef = doc(db,"debts",selectedDebt.id);
         await updateDoc(debtRef,{amount:remainingAmount-amt});
       } else {
-        await updateDoc(debtRef,{amount:0,status:"تم السداد"});
+        await deleteDebtWithImageCleanup(selectedDebt);
       }
 
       fetchDebts();
@@ -323,7 +478,7 @@ function Debts() {
       const snapshot = await getDocs(q);
       const paidDebts = snapshot.docs.filter(d=>d.data().status==="تم السداد");
       for (const d of paidDebts) {
-        await deleteDoc(doc(db,"debts",d.id));
+        await deleteDebtWithImageCleanup({ id: d.id, ...d.data() });
       }
       toast("تم حذف جميع الديون المسددة", "success");
       fetchDebts();
@@ -363,6 +518,36 @@ function Debts() {
           {userEmail ? (
             <div className={styles.info}>
               <div className="inputContainer">
+                <label>صورة الدين:</label>
+                <input
+                  id="debt-image-input"
+                  key={imageInputKey}
+                  type="file"
+                  accept="image/*"
+                  className={styles.hiddenUploadInput}
+                  onChange={handleImageChange}
+                />
+                {!(imagePreviewUrl || (existingImageUrl && !removeImageOnEdit)) ? (
+                  <label htmlFor="debt-image-input" className={styles.uploadField}>
+                    <span className={styles.uploadFieldIcon}><MdOutlineFileUpload /></span>
+                    <span>اضغط لإضافة صورة الدين</span>
+                  </label>
+                ) : (
+                  <div className={styles.fullImagePreviewWrap}>
+                    <img
+                      src={imagePreviewUrl || existingImageUrl}
+                      alt="debt proof"
+                      className={styles.fullImagePreview}
+                    />
+                    <label htmlFor="debt-image-input" className={styles.changeImageBtn}>
+                      تغيير الصورة
+                    </label>
+                  </div>
+                )}
+                {!editId && <small>الصورة مطلوبة لإضافة دين جديد.</small>}
+                {selectedImageFile && <small>تم اختيار: {selectedImageFile.name}</small>}
+              </div>
+              <div className="inputContainer">
                 <label>اسم العميل:</label>
                 <input type="text" placeholder="ادخل اسم العميل" value={clientName} onChange={e=>setClientName(e.target.value)} />
               </div>
@@ -393,8 +578,20 @@ function Debts() {
                   <option value="عليك">عليك</option>
                 </select>
               </div>
+              {editId && existingImageUrl && (
+                <label className={styles.removeImageLabel}>
+                  <input
+                    type="checkbox"
+                    checked={removeImageOnEdit}
+                    onChange={(e) => setRemoveImageOnEdit(e.target.checked)}
+                  />
+                  حذف الصورة الحالية
+                </label>
+              )}
               
-              <button onClick={handleSubmit} className={styles.addBtn}>{editId?"تعديل العميل":"اضافة العميل"}</button>
+              <button onClick={handleSubmit} className={styles.addBtn} disabled={isUploadingImage}>
+                {isUploadingImage ? "جاري رفع الصورة..." : editId ? "تعديل العميل" : "اضافة العميل"}
+              </button>
             </div>
           ):(<p>⚠️ جاري التعرف على المستخدم...</p>)}
         </div>
@@ -402,21 +599,28 @@ function Debts() {
         {/* عرض الكل */}
         <div className={styles.debtsContent} style={{display:active===1?"flex":"none"}}>
           <div className={styles.headContainer}>
-            <div className={styles.totals}>
-              <strong>ليك: {totalLik} ج.م</strong>
-              <strong>عليك: {totalAlyek} ج.م</strong>
+            <div className={styles.summaryCards}>
+              <article className={styles.summaryCard}>
+                <span>ليك</span>
+                <strong>{totalLik} ج.م</strong>
+              </article>
+              <article className={`${styles.summaryCard} ${styles.summaryCardDanger}`}>
+                <span>عليك</span>
+                <strong>{totalAlyek} ج.م</strong>
+              </article>
             </div>
+          </div>
+          <div className={styles.tableContainer}>
             <div className={styles.headBtns}>
               <button onClick={exportToExcel}>Excel</button>
               <button onClick={deletePaidDebts}>حذف المسدد</button>
             </div>
-          </div>
-          <div className={styles.tableContainer}>
             <table>
               <thead>
                 <tr>
-                  <th>المستخدم</th>
+                  <th>الصورة</th>
                   <th>اسم العميل</th>
+                  <th>المستخدم</th>
                   <th>المبلغ</th>
                   <th>النوع</th>
                   <th>طريقة الدفع</th>
@@ -428,8 +632,22 @@ function Debts() {
               <tbody>
                 {debts.map(d=>(
                   <tr key={d.id}>
-                    <td>{d.userName}</td>
+                    <td>
+                      {d.imageUrl ? (
+                        <button
+                          type="button"
+                          className={styles.imageThumbBtn}
+                          onClick={() => setZoomedImageUrl(d.imageUrl)}
+                          title="عرض الصورة"
+                        >
+                          <img src={d.imageUrl} alt={d.clientName || "debt image"} className={styles.tableDebtImage} />
+                        </button>
+                      ) : (
+                        <span className={styles.imageFallback}>-</span>
+                      )}
+                    </td>
                     <td>{d.clientName}</td>
+                    <td>{d.userName}</td>
                     <td>{d.amount} ج.م</td>
                     <td>{d.debtType}</td>
                     <td>{d.payMethod==="محفظة" ? `محفظة - ${d.walletPhone||""}` : "نقدي"}</td>
@@ -481,6 +699,13 @@ function Debts() {
               </div>
               <button className={styles.confirmBtn} onClick={handlePay}>تأكيد السداد</button>
             </div>
+          </div>
+        </div>
+      )}
+      {zoomedImageUrl && (
+        <div className={styles.popupOverlay} onClick={() => setZoomedImageUrl("")}>
+          <div className={styles.imagePopupContent} onClick={(e) => e.stopPropagation()}>
+            <img src={zoomedImageUrl} alt="debt enlarged" className={styles.zoomedDebtImage} />
           </div>
         </div>
       )}

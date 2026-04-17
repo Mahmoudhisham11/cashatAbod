@@ -15,7 +15,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com"/>
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin=""/>
         <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200..1000&display=swap" rel="stylesheet"/>
         
         <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
