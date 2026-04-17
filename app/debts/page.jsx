@@ -518,13 +518,43 @@ function Debts() {
           {userEmail ? (
             <div className={styles.info}>
               <div className="inputContainer">
-                <label>صورة الدين:</label>
+                <label>التقط صورة الدين</label>
                 <input
                   id="debt-image-input"
                   key={imageInputKey}
                   type="file"
                   accept="image/*"
                   capture="environment"
+                  className={styles.hiddenUploadInput}
+                  onChange={handleImageChange}
+                />
+                {!(imagePreviewUrl || (existingImageUrl && !removeImageOnEdit)) ? (
+                  <label htmlFor="debt-image-input" className={styles.uploadField}>
+                    <span className={styles.uploadFieldIcon}><MdOutlineFileUpload /></span>
+                    <span>اضغط لإضافة صورة الدين</span>
+                  </label>
+                ) : (
+                  <div className={styles.fullImagePreviewWrap}>
+                    <img
+                      src={imagePreviewUrl || existingImageUrl}
+                      alt="debt proof"
+                      className={styles.fullImagePreview}
+                    />
+                    <label htmlFor="debt-image-input" className={styles.changeImageBtn}>
+                      تغيير الصورة
+                    </label>
+                  </div>
+                )}
+                {!editId && <small>الصورة مطلوبة لإضافة دين جديد.</small>}
+                {selectedImageFile && <small>تم اختيار: {selectedImageFile.name}</small>}
+              </div>
+              <div className="inputContainer">
+                <label>اختر صورة الدين</label>
+                <input
+                  id="debt-image-input"
+                  key={imageInputKey}
+                  type="file"
+                  accept="image/*"
                   className={styles.hiddenUploadInput}
                   onChange={handleImageChange}
                 />
