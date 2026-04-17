@@ -2,7 +2,7 @@
 import styles from "./styles.module.css";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { MdOutlineKeyboardArrowLeft, MdModeEditOutline, MdOutlineFileUpload } from "react-icons/md";
+import { MdOutlineKeyboardArrowLeft, MdModeEditOutline, MdPhotoCamera, MdPhotoLibrary } from "react-icons/md";
 import { FaRegMoneyBillAlt, FaTimes } from "react-icons/fa";
 import { collection, addDoc, getDocs, query, doc, updateDoc, deleteDoc, where } from "firebase/firestore";
 import { db } from "../firebase";
@@ -518,51 +518,35 @@ function Debts() {
           {userEmail ? (
             <div className={styles.info}>
               <div className="inputContainer">
-                <label>التقط صورة الدين</label>
+                <label>صورة الدين</label>
                 <input
-                  id="debt-image-input"
-                  key={imageInputKey}
+                  id="debt-image-camera"
+                  key={`debt-cam-${imageInputKey}`}
                   type="file"
                   accept="image/*"
                   capture="environment"
                   className={styles.hiddenUploadInput}
                   onChange={handleImageChange}
                 />
-                {!(imagePreviewUrl || (existingImageUrl && !removeImageOnEdit)) ? (
-                  <label htmlFor="debt-image-input" className={styles.uploadField}>
-                    <span className={styles.uploadFieldIcon}><MdOutlineFileUpload /></span>
-                    <span>اضغط لإضافة صورة الدين</span>
-                  </label>
-                ) : (
-                  <div className={styles.fullImagePreviewWrap}>
-                    <img
-                      src={imagePreviewUrl || existingImageUrl}
-                      alt="debt proof"
-                      className={styles.fullImagePreview}
-                    />
-                    <label htmlFor="debt-image-input" className={styles.changeImageBtn}>
-                      تغيير الصورة
-                    </label>
-                  </div>
-                )}
-                {!editId && <small>الصورة مطلوبة لإضافة دين جديد.</small>}
-                {selectedImageFile && <small>تم اختيار: {selectedImageFile.name}</small>}
-              </div>
-              <div className="inputContainer">
-                <label>اختر صورة الدين</label>
                 <input
-                  id="debt-image-input"
-                  key={imageInputKey}
+                  id="debt-image-gallery"
+                  key={`debt-gal-${imageInputKey}`}
                   type="file"
                   accept="image/*"
                   className={styles.hiddenUploadInput}
                   onChange={handleImageChange}
                 />
                 {!(imagePreviewUrl || (existingImageUrl && !removeImageOnEdit)) ? (
-                  <label htmlFor="debt-image-input" className={styles.uploadField}>
-                    <span className={styles.uploadFieldIcon}><MdOutlineFileUpload /></span>
-                    <span>اضغط لإضافة صورة الدين</span>
-                  </label>
+                  <div className={styles.imagePickRow}>
+                    <label htmlFor="debt-image-camera" className={styles.uploadField}>
+                      <span className={styles.uploadFieldIcon}><MdPhotoCamera /></span>
+                      <span>التقط بالكاميرا</span>
+                    </label>
+                    <label htmlFor="debt-image-gallery" className={styles.uploadField}>
+                      <span className={styles.uploadFieldIcon}><MdPhotoLibrary /></span>
+                      <span>اختر من المعرض</span>
+                    </label>
+                  </div>
                 ) : (
                   <div className={styles.fullImagePreviewWrap}>
                     <img
@@ -570,9 +554,14 @@ function Debts() {
                       alt="debt proof"
                       className={styles.fullImagePreview}
                     />
-                    <label htmlFor="debt-image-input" className={styles.changeImageBtn}>
-                      تغيير الصورة
-                    </label>
+                    <div className={styles.previewChangeRow}>
+                      <label htmlFor="debt-image-camera" className={styles.changeImageRowBtn}>
+                        كاميرا
+                      </label>
+                      <label htmlFor="debt-image-gallery" className={styles.changeImageRowBtn}>
+                        المعرض
+                      </label>
+                    </div>
                   </div>
                 )}
                 {!editId && <small>الصورة مطلوبة لإضافة دين جديد.</small>}

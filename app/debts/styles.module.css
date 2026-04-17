@@ -392,6 +392,43 @@
   font-size: 13px;
 }
 
+.imagePickRow {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+@media (min-width: 480px) {
+  .imagePickRow {
+    flex-direction: row;
+    align-items: stretch;
+  }
+}
+
+.imagePickRow .uploadField {
+  flex: 1;
+  min-height: 120px;
+}
+
+.previewChangeRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.changeImageRowBtn {
+  flex: 1;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
 /* Animations */
 @keyframes fadeIn {
   from {opacity: 0;}
