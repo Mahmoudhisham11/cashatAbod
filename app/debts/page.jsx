@@ -524,6 +524,7 @@ function Debts() {
                   key={imageInputKey}
                   type="file"
                   accept="image/*"
+                  capture="environment"
                   className={styles.hiddenUploadInput}
                   onChange={handleImageChange}
                 />
